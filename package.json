@@ -11,7 +11,7 @@
     "tower-defense",
     "electron"
   ],
-  "author": "Why ur asking this",
+  "author": "CalyxNova",
   "license": "MIT",
   "devDependencies": {
     "electron": "^27.0.0"
