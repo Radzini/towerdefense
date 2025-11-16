@@ -1,0 +1,19 @@
+{
+  "name": "tower-defense-game",
+  "version": "1.0.0",
+  "description": "A 2D tower defense game inspired by TDX, TDS, and BTD series",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "game",
+    "tower-defense",
+    "electron"
+  ],
+  "author": "Why ur asking this",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0"
+  }
+}

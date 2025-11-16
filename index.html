@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tower Defense Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <!-- Game Mode Selection UI -->
+    <div id="gameModeUI">
+        <div class="mode-selection">
+            <button id="closeMenuBtn" class="close-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✕</button>
+            <h1>🏰 Tower Defense</h1>
+            <div class="selection-row">
+                <label for="modeSelect">Game Mode:</label>
+                <select id="modeSelect">
+                    <option value="NORMAL">Normal (40 waves)</option>
+                    <option value="HARDMODE">Hardmode (40 waves)</option>
+                    <option value="INSANE">Insane (50 waves)</option>
+                    <option value="ENDLESS">Endless (∞)</option>
+                </select>
+            </div>
+            <div class="selection-row">
+                <label for="mapSelect">Map:</label>
+                <select id="mapSelect">
+                    <option value="STANDARD">Standard Path</option>
+                    <option value="STRAIGHT">Straight Line</option>
+                    <option value="INTERSECTION">Intersection</option>
+                </select>
+            </div>
+            <button id="startGameBtn">▶ Start Game</button>
+        </div>
+    </div>
+
+    <div id="soundModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔊 Sound Settings</h2>
+                <button class="close-modal-btn" id="closeSoundModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Sound effects are currently unavailable in this build.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top HUD -->
+    <div id="topHUD">
+        <div class="hud-section">
+            <div class="hud-item">
+                <span class="hud-icon">💰</span>
+                <span class="hud-label">Cash:</span>
+                <span id="cashDisplay" class="hud-value">250</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-icon">🌊</span>
+                <span class="hud-label">Wave:</span>
+                <span id="waveDisplay" class="hud-value">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-icon">❤️</span>
+                <span class="hud-label">HP:</span>
+                <span id="baseHpDisplay" class="hud-value">100</span>
+            </div>
+        </div>
+        <div class="hud-section">
+            <span id="modeDisplay" class="mode-badge"></span>
+        </div>
+        <div class="hud-section hud-controls">
+            <button id="nextWaveBtn" class="hud-btn primary" title="Start next wave (Space)">
+                <span>▶ Start Wave</span>
+            </button>
+            <button id="skipWaveBtn" class="hud-btn warning" title="Skip current wave">
+                <span>⏭ Skip Wave</span>
+            </button>
+            <button id="toggleTowerPanelBtn" class="hud-btn info" title="Toggle tower panel (T)">
+                <span>🗼 Towers</span>
+            </button>
+            <button id="cheatMenuBtn" class="hud-btn special" title="Open cheat menu">
+                <span>🎮 Cheats</span>
+            </button>
+            <button id="menuBtn" class="hud-btn danger" title="Return to main menu">
+                <span>🏠 Menu</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Tower Selection Panel -->
+    <div id="towerPanel">
+        <div class="panel-header">
+            <h3>🗼 Towers</h3>
+            <button id="closeTowerPanelBtn" class="close-panel-btn" title="Close tower panel (Esc)">✕</button>
+        </div>
+        <div class="tower-grid">
+            <div class="tower-card" id="gunnerBtn" data-hotkey="1">
+                <div class="tower-icon">🔫</div>
+                <div class="tower-name">Gunner</div>
+                <div class="tower-cost">$150</div>
+                <div class="tower-hotkey">[1]</div>
+            </div>
+            <div class="tower-card" id="sniperBtn" data-hotkey="2">
+                <div class="tower-icon">🎯</div>
+                <div class="tower-name">Sniper</div>
+                <div class="tower-cost">$500</div>
+                <div class="tower-hotkey">[2]</div>
+            </div>
+            <div class="tower-card" id="rocketerBtn" data-hotkey="3">
+                <div class="tower-icon">🚀</div>
+                <div class="tower-name">Rocketer</div>
+                <div class="tower-cost">$350</div>
+                <div class="tower-hotkey">[3]</div>
+            </div>
+            <div class="tower-card" id="raygunnerBtn" data-hotkey="4">
+                <div class="tower-icon">⚡</div>
+                <div class="tower-name">Raygunner</div>
+                <div class="tower-cost">$2000</div>
+                <div class="tower-hotkey">[4]</div>
+            </div>
+            <div class="tower-card" id="railgunnerBtn" data-hotkey="5">
+                <div class="tower-icon">🔷</div>
+                <div class="tower-name">Railgunner</div>
+                <div class="tower-cost">$2500</div>
+                <div class="tower-hotkey">[5]</div>
+            </div>
+            <div class="tower-card" id="summonerBtn" data-hotkey="6">
+                <div class="tower-icon">🧙</div>
+                <div class="tower-name">Summoner</div>
+                <div class="tower-cost">$6000</div>
+                <div class="tower-hotkey">[6]</div>
+            </div>
+            <div class="tower-card" id="farmBtn" data-hotkey="7">
+                <div class="tower-icon">🌾</div>
+                <div class="tower-name">Farm</div>
+                <div class="tower-cost">$200</div>
+                <div class="tower-hotkey">[7]</div>
+            </div>
+            <div class="tower-card" id="eliteSpawnerBtn" data-hotkey="8">
+                <div class="tower-icon">⭐</div>
+                <div class="tower-name">Elite Spawner</div>
+                <div class="tower-cost">$10000</div>
+                <div class="tower-hotkey">[8]</div>
+            </div>
+            <div class="tower-card" id="commanderBtn" data-hotkey="9">
+                <div class="tower-icon">👑</div>
+                <div class="tower-name">Commander</div>
+                <div class="tower-cost">$1200</div>
+                <div class="tower-hotkey">[9]</div>
+            </div>
+            <div class="tower-card" id="executiveBtn" data-hotkey="0">
+                <div class="tower-icon">💼</div>
+                <div class="tower-name">Executive</div>
+                <div class="tower-cost">$3000</div>
+                <div class="tower-hotkey">[0]</div>
+            </div>
+            <div class="tower-card" id="cubeFactoryBtn" data-hotkey="C">
+                <div class="tower-icon">🏭</div>
+                <div class="tower-name">Cube Factory</div>
+                <div class="tower-cost">$50000</div>
+                <div class="tower-hotkey">[C]</div>
+            </div>
+            <!-- Gunner Paragon is an upgrade, not a placeable tower -->
+        </div>
+    </div>
+    
+    <!-- Tower Info Panel (Persistent) -->
+    <div id="towerInfoPanel">
+        <div class="panel-header">
+            <h3>Tower Info</h3>
+            <button id="closeTowerInfo" class="close-btn">✕</button>
+        </div>
+        <div id="towerInfoContent">
+            <p class="no-selection">Click on a tower to view details</p>
+        </div>
+        <div id="towerActions" style="display: none;">
+            <button id="upgradeTowerBtn" class="upgrade-btn">⬆️ Upgrade</button>
+            <button id="sellTowerBtn" class="sell-btn">💰 Sell</button>
+            <button id="abilityTowerBtn" class="upgrade-btn" style="display: none;">🌈 Ability</button>
+            <button id="ability2TowerBtn" class="upgrade-btn" style="display: none;">⚡ Ability 2</button>
+        </div>
+    </div>
+    
+    <!-- Cheat Menu Modal -->
+    <div id="cheatModal" class="modal hidden">
+        <div class="modal-content cheat-content">
+            <div class="modal-header">
+                <h2>🎮 Cheat Menu</h2>
+                <button class="close-modal-btn" id="closeCheatModal">✕</button>
+            </div>
+            <div class="cheat-grid">
+                <button id="addMoneyBtn" class="cheat-btn">💰 +$10,000</button>
+                <button id="addLivesBtn" class="cheat-btn">❤️ +50 Lives</button>
+                <button id="completeWaveBtn" class="cheat-btn">⏭ Complete Wave</button>
+                <button id="killAllBtn" class="cheat-btn">💀 Kill All Enemies</button>
+                <button id="maxTowersBtn" class="cheat-btn">⬆️ Max All Towers</button>
+                <button id="invincibleBtn" class="cheat-btn">🛡️ Toggle Invincible</button>
+                <button id="freeUpgradesBtn" class="cheat-btn">🆓 Free Upgrades</button>
+                <button id="speedUpBtn" class="cheat-btn">⚡ Speed x2</button>
+                <button id="spawnDummyBtn" class="cheat-btn">🎯 Spawn Test Dummy</button>
+            </div>
+            <div class="cheat-input-section">
+                <label>Set Wave Number:</label>
+                <div class="input-group">
+                    <input type="number" id="waveInput" min="1" max="100" value="1">
+                    <button id="setWaveBtn" class="cheat-btn small">Set</button>
+                </div>
+            </div>
+            <div class="cheat-input-section">
+                <label>Set Money:</label>
+                <div class="input-group">
+                    <input type="number" id="moneyInput" min="0" step="100" value="1000">
+                    <button id="setMoneyBtn" class="cheat-btn small">Set</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load game configuration files first -->
+    <script src="enemies.js"></script>
+    <script src="waves.js"></script>
+    
+    <!-- Load main game script -->
+    <script src="script.js"></script>
+</body>
+</html>
