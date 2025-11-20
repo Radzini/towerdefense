@@ -2231,7 +2231,6 @@ function startNextWave() {
         nextWaveBtn.textContent = "Wave in Progress...";
         nextWaveBtn.disabled = true;
         skipWaveBtn.disabled = false;
-
         generateFarmCash();
         updateCashDisplay();
     }
@@ -2250,7 +2249,6 @@ function skipWave() {
         // Apply cash multiplier from game mode
         const waveCashReward = Math.floor(60 * Math.pow(1.1, waveNumber - 1) * currentGameMode.cashMultiplier);
         cash += waveCashReward;
-    
         updateCashDisplay();
     }
 }
@@ -3731,7 +3729,7 @@ function checkWaveComplete() {
         // Apply cash multiplier
         const waveCashReward = Math.floor(60 * Math.pow(1.1, waveNumber - 1) * currentGameMode.cashMultiplier);
         cash += waveCashReward;
-        
+        generateFarmCash();
         updateCashDisplay();
         
         // Auto-start next wave after 3 seconds
