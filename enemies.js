@@ -71,7 +71,7 @@ const ENEMY_TYPES = {
     // ===== TEST DUMMY =====
     test_dummy: { name: 'Test Dummy', baseHp: 10000000, speed: 0.1, color: '#FFD700', size: 50, isBoss: true, showHpBar: true, isTestDummy: true },
     // ===== ENDLESS MODE BOSSES =====
-    devastator: { name: 'Devastator', baseHp: 35000, speed: 0.3, color: '#800000', size: 40, isBoss: true },
-    gargantuar_king: { name: 'Gargantuar King', baseHp: 150000, shieldHp: 50000, speed: 0.2, color: '#800000', size: 35, hasShield: true, isBoss: true, isKing: true },
+    devastator: { name: 'Devastator', baseHp: 35000, speed: 0.3, color: '#800000', size: 40, isBoss: true, showHpBar: true  },
+    gargantuar_king: { name: 'Gargantuar King', baseHp: 150000, shieldHp: 50000, speed: 0.2, color: '#800000', size: 35, hasShield: true, isBoss: true, isKing: true, showHpBar: true  },
     cube_destructor: { name: 'Cube Destructor', baseHp: 600000, speed: 0.25, color: '#800000', size: 45, isBoss: true, showHpBar: true }
 };
