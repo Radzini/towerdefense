@@ -56,6 +56,7 @@ const speedUpBtn = document.getElementById('speedUpBtn');
 const setWaveBtn = document.getElementById('setWaveBtn');
 const setMoneyBtn = document.getElementById('setMoneyBtn');
 const waveInput = document.getElementById('waveInput');
+waveInput.max = 1000000; // Allow setting up to wave 1000000
 const moneyInput = document.getElementById('moneyInput');
 
 // Game state flags
@@ -127,7 +128,7 @@ const GAME_MODES = {
 const MAP_TYPES = {
     STANDARD: {
         name: "Standard",
-        createPath: function(gridWidth, gridHeight) {
+        createPath: function (gridWidth, gridHeight) {
             const pathPoints = [
                 { x: 0, y: Math.floor(gridHeight / 4) },
                 { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 4) },
@@ -141,7 +142,7 @@ const MAP_TYPES = {
     },
     STRAIGHT: {
         name: "Straight Line",
-        createPath: function(gridWidth, gridHeight) {
+        createPath: function (gridWidth, gridHeight) {
             const pathPoints = [
                 { x: 0, y: Math.floor(gridHeight / 2) },
                 { x: gridWidth - 1, y: Math.floor(gridHeight / 2) }
@@ -151,7 +152,7 @@ const MAP_TYPES = {
     },
     INTERSECTION: {
         name: "Intersection",
-        createPath: function(gridWidth, gridHeight) {
+        createPath: function (gridWidth, gridHeight) {
             const pathPoints = [
                 { x: 0, y: Math.floor(gridHeight / 4) },
                 { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 4) },
@@ -206,391 +207,13 @@ let hpBarToggleRect = null;
 let lastTowerInfoUpdate = 0;
 let selectedTowerForTimer = null;
 
-// Tower Types with balanced values
-const TOWER_TYPES = {
-    GUNNER: { name: 'Gunner', color: 'yellow', cost: 150, aoe: false, summons: false,
-        levels: [
-            { damage: 1, fireRate: 500, range: 3, upgradeCost: 0 },
-            { damage: 2, fireRate: 450, range: 3, upgradeCost: 75 },
-            { damage: 5, fireRate: 400, range: 4, upgradeCost: 200 },
-            { damage: 8, fireRate: 350, range: 4, upgradeCost: 350 }
-        ]
-    },
-    SNIPER: { name: 'Sniper', color: 'red', cost: 500, aoe: false, summons: false,
-        levels: [
-            { damage: 10, fireRate: 3000, range: 8, upgradeCost: 0 },
-            { damage: 35, fireRate: 2800, range: 9, upgradeCost: 300 },
-            { damage: 75, fireRate: 2500, range: 10, upgradeCost: 500 },
-            { damage: 125, fireRate: 2000, range: 12, upgradeCost: 800 }
-        ]
-    },
-    ROCKETER: { name: 'Rocketer', color: 'orange', cost: 350, aoe: true, summons: false,
-        levels: [
-            { damage: 10, directDamage: 25, fireRate: 2500, range: 4, upgradeCost: 0 },
-            { damage: 25, directDamage: 50, fireRate: 2500, range: 4, upgradeCost: 350 },
-            { damage: 40, directDamage: 80, fireRate: 2000, range: 5, upgradeCost: 800 },
-            { damage: 60, directDamage: 120, fireRate: 2000, range: 6, upgradeCost: 1500 }
-        ]
-    },
-    RAYGUNNER: { name: 'Raygunner', color: 'purple', cost: 2000, aoe: false, summons: false,
-        levels: [
-            { damage: 3, fireRate: 100, range: 4, upgradeCost: 0 },
-            { damage: 5, fireRate: 90, range: 6, upgradeCost: 750 },
-            { damage: 8, fireRate: 80, range: 7, upgradeCost: 2000 },
-            { damage: 12, fireRate: 40, range: 8, upgradeCost: 5000 }
-        ]
-    },
-    SUMMONER: { name: 'Summoner', color: 'green', cost: 6000, aoe: false, summons: true, limit: 2,
-        levels: [
-            { summons: [{ type: 'RED', spawnRate: 10000 }], upgradeCost: 0 },
-            { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }], upgradeCost: 1000 },
-            { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }, { type: 'GRAY', spawnRate: 15000 }], upgradeCost: 2500 },
-            { summons: [{ type: 'RED_L4', spawnRate: 9000 }, { type: 'YELLOW_L4', spawnRate: 9000 }, { type: 'GRAY_L4', spawnRate: 9000 }, { type: 'DARK_RED', spawnRate: 18000 }], upgradeCost: 6250 },
-            { summons: [{ type: 'DARK_RED_L5', spawnRate: 12000 }, { type: 'CYAN', spawnRate: 20000 }], upgradeCost: 10000 }
-        ]
-    },
-    FARM: { name: 'Farm', color: '#006400', cost: 200, aoe: false, summons: false, farm: true,
-        levels: [
-            { cashPerWave: 100, upgradeCost: 0 },
-            { cashPerWave: 350, upgradeCost: 250 },
-            { cashPerWave: 1000, upgradeCost: 600 },
-            { cashPerWave: 2500, upgradeCost: 1500 }
-        ]
-    },
-    RAILGUNNER: { 
-        name: 'Railgunner', 
-        color: '#00B7EB', 
-        cost: 2500, 
-        aoe: false, 
-        summons: false,
-        levels: [
-            { damage: 100, fireRate: 3500, range: 5, upgradeCost: 0 },
-            { damage: 250, fireRate: 3200, range: 7, upgradeCost: 1000 },
-            { damage: 600, fireRate: 3000, range: 9, upgradeCost: 3000 },
-            { damage: 1000, fireRate: 3500, range: 12, upgradeCost: 5000 }
-        ]
-    },
-    ELITE_SPAWNER: { 
-        name: 'Elite Spawner', 
-        color: '#FFD700', 
-        cost: 25000, 
-        aoe: false, 
-        summons: true,
-        size: 2,
-        limit: 1,
-        abilityCooldown: 80000,
-        levels: [
-            { summons: [{ type: 'BLUE_SQUARE', spawnRate: 12000 }], upgradeCost: 0 },
-            { summons: [{ type: 'BLUE_SQUARE_L2', spawnRate: 10000 }, { type: 'PINK_SQUARE', spawnRate: 10000 }], upgradeCost: 5000 },
-            { summons: [{ type: 'BLUE_SQUARE_L3', spawnRate: 10000 }, { type: 'PINK_SQUARE_L3', spawnRate: 10000 }, { type: 'ORANGE_SQUARE', spawnRate: 10000 }], upgradeCost: 5000 },
-            { summons: [{ type: 'BLUE_SQUARE_L4', spawnRate: 10000 }, { type: 'PINK_SQUARE_L4', spawnRate: 10000 }, { type: 'ORANGE_SQUARE_L4', spawnRate: 10000 }, { type: 'DARK_BLUE_SQUARE', spawnRate: 15000 }], upgradeCost: 20000 },
-            { summons: [{ type: 'GREEN_SQUARE', spawnRate: 6000 }, { type: 'PINK_SQUARE_L5', spawnRate: 6000 }, { type: 'DARK_BLUE_SQUARE_L5', spawnRate: 7500 }], upgradeCost: 75000 }
-        ]
-    },
-    COMMANDER: {
-        name: 'Commander',
-        color: '#4169E1',
-        cost: 1200,
-        limit: 4,
-        aoe: false,
-        summons: false,
-        support: true,
-        levels: [
-            { rangeBoost: 0.5, fireRateBoost: 0.05, damageBoost: 0.05, range: 3, upgradeCost: 0 },
-            { rangeBoost: 1, fireRateBoost: 0.1, damageBoost: 0.1, range: 4, upgradeCost: 800 },
-            { rangeBoost: 1.5, fireRateBoost: 0.15, damageBoost: 0.15, range: 5, upgradeCost: 1500 },
-            { rangeBoost: 2, fireRateBoost: 0.2, damageBoost: 0.2, range: 6, upgradeCost: 3000 },
-            { rangeBoost: 3, fireRateBoost: 0.25, damageBoost: 0.3, range: 7, upgradeCost: 6000 }
-        ]
-    },
-    EXECUTIVE: {
-        name: 'Executive',
-        color: '#DC143C',
-        cost: 3000,
-        aoe: false,
-        summons: false,
-        hasAbility: true,
-        limit: 1,
-        abilityCost: 14000,
-        abilityCooldown: 30000,
-        levels: [
-            { damage: 15, fireRate: 2000, range: 2, upgradeCost: 0 },
-            { damage: 20, fireRate: 1000, range: 3, upgradeCost: 800 },
-            { damage: 35, fireRate: 500, range: 4, upgradeCost: 3000 },
-            { damage: 30, fireRate: 100, range: 5, upgradeCost: 12000 },
-            { damage: 75, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true }
-        ]
-    },
-CUBE_FACTORY: {
-    name: 'Cube Factory',
-    color: '#17a92c64', // A distinct color for the factory itself
-    cost: 50000,
-    aoe: false,
-    summons: true,
-    limit: 1, // Factory placement limit
-    maxActiveSummons: 3, // Limit for active spawned units from this factory
-    size: 3, // Cube Factory is 3x3 visual
-    globalSpawnCooldown: 10000, // 10 seconds global cooldown for any Factory Cube spawn
-    cooldownReductionOnUpgrade: 10000, // Reduce global cooldown by 10 seconds on upgrade
-    levels: [
-        // Level 1: After placing
-        {
-            summons: [{ type: 'FACTORY_CUBE_L1', spawnRate: 50000 }], // Individual tower spawn rate (overridden by global)
-            upgradeCost: 0
-        },
-        // Level 2: $75000 upgrade
-        {
-            summons: [{ type: 'FACTORY_CUBE_L2', spawnRate: 50000 }],
-            upgradeCost: 75000
-        },
-        // Level 3: $175000 upgrade
-        {
-            summons: [{ type: 'FACTORY_CUBE_L3', spawnRate: 60000 }],
-            upgradeCost: 175000
-        }
-    ]
-},
-    GUNNER_PARAGON: {
-        name: 'Gunner Paragon',
-        color: '#FF00FF',
-        cost: 100000,
-        aoe: false,
-        summons: false,
-        size: 2,
-        limit: 1,
-        isParagon: true,
-        cannotBeBuffed: true,
-        rangeBonus: 2,
-        hasAlpha: true,
-        alphaCost: 7500,
-        alphaCooldown: 60000,
-        hasBeta: true,
-        betaCost: 20000,
-        betaCooldown: 90000,
-        levels: [
-            { 
-                damage: 75,
-                fireRate: 100,
-                range: 5,
-                radian: 1, 
-                baseHp: 250, 
-                alphaMultiplier: 10,
-                upgradeCost: 0
-            },
-            { 
-                damage: 125,
-                fireRate: 80,
-                range: 8,
-                radian: 2, 
-                baseHp: 500, 
-                hasAlpha: true, 
-                alphaMultiplier: 10,
-                upgradeCost: 0
-            },
-            { 
-                damage: 200,
-                fireRate: 50,
-                range: 10,
-                radian: 3, 
-                baseHp: 1000, 
-                hasAlpha: true, 
-                alphaMultiplier: 50,
-                hasBeta: true,
-                upgradeCost: 0
-            }
-        ]
-    },
-    SNIPER_PARAGON: {
-        name: 'Sniper Paragon',
-        color: '#00FFFF',
-        cost: 125000,
-        aoe: false,
-        summons: false,
-        size: 2,
-        limit: 1,
-        isParagon: true,
-        cannotBeBuffed: true,
-        rangeBonus: 2,
-        levels: [
-            { 
-                damage: 8000,
-                fireRate: 3000,
-                range: 8,
-                radian: 1,
-                upgradeCost: 0
-            },
-            { 
-                damage: 16000,
-                fireRate: 3000,
-                range: 12,
-                radian: 2,
-                upgradeCost: 0
-            },
-            { 
-                damage: 20000,
-                fireRate: 2500,
-                range: 15,
-                radian: 3,
-                explosionDamage: 5000,
-                explosionDelay: 500,
-                sniperBuff: 75,
-                railgunnerBuff: 200,
-                upgradeCost: 0
-            }
-        ]
-    }
-};
+// Wave Management State
+let activeWaves = []; // Array of active wave objects
+// Removed: currentWaveData, currentGroupIndex, groupWaitTimer, isWaitingAfterGroup, enemiesToSpawn, lastSpawnTime
 
-// Summon Types
-const SUMMON_TYPES = {
-    RED: { name: 'Red Cube', color: 'red', hp: 20, speed: 1, size: 20, isSummon: true },
-    YELLOW: { name: 'Yellow Cube', color: 'yellow', hp: 10, speed: 1.5, size: 15, isSummon: true },
-    GRAY: { name: 'Gray Cube', color: 'gray', hp: 50, speed: 0.6, size: 20, isSummon: true },
-    RED_L4: { name: 'Red Cube L4', color: 'red', hp: 120, speed: 1, size: 20, isSummon: true },
-    YELLOW_L4: { name: 'Yellow Cube L4', color: 'yellow', hp: 100, speed: 1.5, size: 15, isSummon: true },
-    GRAY_L4: { name: 'Gray Cube L4', color: 'gray', hp: 150, speed: 0.6, size: 20, isSummon: true },
-    DARK_RED: { name: 'Dark Red Cube', color: 'darkred', hp: 500, speed: 0.3, size: 30, isSummon: true },
-    DARK_RED_L5: { name: 'Dark Red Cube L5', color: 'darkred', hp: 1000, speed: 0.3, size: 30, isSummon: true },
-    // Paragon summons
-    PARAGON_BASE: { name: 'Paragon Cube', color: '#FF00FF', hp: 250, speed: 1.2, size: 20, isSummon: true },
-    PARAGON_ALPHA: { name: 'Alpha Cube', color: '#FFD700', hp: 2500, speed: 1.0, size: 30, isSummon: true },
-    // Beta Protocol summons
-    BETA_GRAY: { name: 'Beta Gray Cube', color: '#808080', hp: 1250, speed: 0.65, size: 22, isSummon: true, damage: 200, fireRate: 200, range: 6 },
-    BETA_BLACK: { name: 'Beta Black Cube', color: '#1A1A1A', hp: 6000, speed: 0.4, size: 28, isSummon: true, damage: 3000, fireRate: 2000, range: 6, aoe: true, aoeRange: 3 },
-    BETA_YELLOW: { name: 'Beta Yellow Cube', color: '#FFFF00', hp: 35000, speed: 0.25, size: 32, isSummon: true, isKamikaze: true, collisionDamage: 5000, deathDamage: 15000, deathRange: 5 },
-    BETA_SHIELD: { name: 'Beta Cube Shield', color: '#418554', hp: 10000, shieldHp: 5000, speed: 0.35, size: 25, isSummon: true, hasShield: true },
-    CYAN: { 
-        name: 'Cyan Cube', 
-        color: 'cyan', 
-        hp: 5000, 
-        speed: 0.4, 
-        size: 35, 
-        isSummon: true,
-        minigunDamage: 150, minigunFireRate: 100,
-        missileDirectDamage: 1000, missileAOEDamage: 500, missileCooldown: 2500, missileCount: 2, missileBurstRate: 400, missileRange: 7,
-        railgunDamage: 2500, railgunFireRate: 2000,
-        range: 10
-    },
-    BLUE_SQUARE: { name: 'Blue Square', color: 'blue', hp: 100, speed: 0.4, size: 25, isSummon: true, damage: 10, fireRate: 500, range: 7 },
-    BLUE_SQUARE_L2: { name: 'Blue Square L2', color: 'blue', hp: 250, speed: 0.4, size: 25, isSummon: true, damage: 10, fireRate: 250, range: 7 },
-    PINK_SQUARE: { name: 'Pink Square', color: 'pink', hp: 200, speed: 0.4, size: 20, isSummon: true, damage: 20, fireRate: 1000, range: 7 },
+// Tower Types and Summon Types are now loaded from towers.js
+// This keeps the codebase organized and makes stats easy to modify
 
-    BLUE_SQUARE_L3: { name: 'Blue Square L3', color: 'blue', hp: 500, speed: 0.4, size: 25, isSummon: true, damage: 50, fireRate: 250, range: 7 },
-    PINK_SQUARE_L3: { name: 'Pink Square L3', color: 'pink', hp: 500, speed: 0.4, size: 20, isSummon: true, damage: 20, fireRate: 100, range: 7 },
-    ORANGE_SQUARE: { name: 'Orange Square', color: 'orange', hp: 500, speed: 0.4, size: 25, isSummon: true, damage: 125, directDamage: 300, fireRate: 2000, range: 8, aoe: true },
-    
-    BLUE_SQUARE_L4: { name: 'Blue Square L4', color: 'blue', hp: 1000, speed: 0.5, size: 25, isSummon: true, damage: 200, fireRate: 250, range: 5 },
-    PINK_SQUARE_L4: { name: 'Pink Square L4', color: 'pink', hp: 1000, speed: 0.5, size: 20, isSummon: true, damage: 60, fireRate: 100, range: 5 },
-    ORANGE_SQUARE_L4: { name: 'Orange Square L4', color: 'orange', hp: 1000, speed: 0.5, size: 25, isSummon: true, damage: 300, directDamage: 750, fireRate: 1500, range: 8, aoe: true },
-    DARK_BLUE_SQUARE: { name: 'Dark Blue Square', color: 'darkblue', hp: 5000, speed: 0.3, size: 30, isSummon: true, selfDestructDamage: 2000 },
-
-    GREEN_SQUARE: { name: 'Green Square', color: 'green', hp: 2500, speed: 0.4, size: 27, isSummon: true, damage: 2000, fireRate: 1000, range: 14 },
-    PINK_SQUARE_L5: { name: 'Pink Square L5', color: 'darkpink', hp: 2000, speed: 0.5, size: 27, isSummon: true, burstDamage: 125, burstCount: 20, burstFireRate: 50, burstCooldown: 1500, range: 12 },
-    DARK_BLUE_SQUARE_L5: { name: 'Dark Blue Square L5', color: 'darkblue', hp: 10000, speed: 0.3, size: 35, isSummon: true, selfDestructDamage: 5000 },
-
-    RAINBOW_CUBE: { 
-        name: 'Rainbow Cube', 
-        color: 'rainbow',
-        hp: 100000, 
-        speed: 0.25, 
-        size: 50, 
-        isSummon: true,
-        railgunDamage: 5000, railgunFireRate: 500, railgunCount: 2, railgunCooldown: 3000,
-        missileDamage: 1500, missileDirectDamage: 2500, missileFireRate: 400, missileCount: 3, missileCooldown: 4000,
-        laserDamage: 250, laserBurstCount: 25, laserFireRate: 40, laserCooldown: 2500,
-        minigunDamage: 150, minigunFireRate: 50,
-        mainRailgunDamage: 50000, mainRailgunCount: 4, mainRailgunFireRate: 250, mainRailgunCooldown: 15000, mainRailgunUses: 2,
-        range: 22 
-    },
-    // Gunner Paragon Beta Summons
-    PARAGON_GRAY: { name: 'Gray Cube', color: '#808080', hp: 2000, speed: 0.4, size: 20, isSummon: true, damage: 444, fireRate: 500, range: 7 },
-    PARAGON_BLACK: { name: 'Black Cube', color: '#000000', hp: 5000, speed: 0.4, size: 22, isSummon: true, damage: 600, fireRate: 1000, range: 8 },
-    PARAGON_PURPLE: { name: 'Purple Cube', color: '#800080', hp: 25000, speed: 0.4, size: 25, isSummon: true, damage: 50, fireRate: 500, range: 5 },
-    PARAGON_GRAY_SHIELD: { name: 'Gray Cube Shield', color: '#A9A9A9', hp: 600, shieldHp: 400, speed: 0.4, size: 20, isSummon: true, hasShield: true },
-
-    // Cube Factory Summoned Units
-    FACTORY_CUBE_L1: {
-        name: 'Factory Cube L1',
-        color: '#8B0000', // Dark Red, like a Dark Blue Cube
-        hp: 15000,
-        speed: 0.25, // Moves slowly
-        size: 35, // Big as Dark Blue Cube (size 30)
-        isSummon: true,
-        range: 12, // General attack range (4 tiles)
-        
-        minigunDamage: 200,
-        minigunFireRate: 100, // 0.1s
-        
-        rocketDamage: 400, // AOE damage
-        rocketDirectDamage: 600, // Direct hit damage (if any)
-        rocketFireRate: 250, // 0.25s
-        rocketCount: 4, // Sends 4 rockets
-        rocketCooldown: 3500, // 5s cooldown for the burst
-        rocketAOERange: 2 // 1 grid AOE range
-    },
-    FACTORY_CUBE_L2: {
-        name: 'Factory Cube L2',
-        color: '#CD5C5C', // Ram Cube color
-        hp: 54000,
-        speed: 0.175, // Slower
-        size: 40, // Big as Ram Cube (size 42)
-        isSummon: true,
-        range: 12,
-        
-        minigunDamage: 250,
-        minigunFireRate: 80, // 0.1s
-        
-        rocketDamage: 600,
-        rocketDirectDamage: 1000,
-        rocketFireRate: 200, // 0.25s
-        rocketCount: 4,
-        rocketCooldown: 4000,
-        rocketAOERange: 3,
-        
-        railgunDamage: 10000, // Strongest enemy
-        railgunCooldown: 7000, // 7s cooldown
-        railgunRange: 100, // Infinite Range
-        
-        knockbackCooldown: 5000, // 5s cooldown for knockback
-        knockbackExplosionRange: 3,
-        knockbackExplosionDamage: 2000,
-        knockbackDirectDamage: 5000,
-        knockbackPower: 3, // Knockback 3 grids
-        
-        isBossKnockbacker: true
-    },
-    FACTORY_CUBE_L3: {
-        name: 'Factory Cube L3',
-        color: '#FFD700', // Gold color, slightly bigger than rainbow
-        hp: 250000,
-        speed: 0.12, // Even slower
-        size: 54, // Slightly bigger than Rainbow Cube (size 50)
-        isSummon: true,
-        range: 14,
-        
-        minigunDamage: 500,
-        minigunFireRate: 80, // 0.08s
-        
-        rocketDamage: 2500,
-        rocketDirectDamage: 3500,
-        rocketFireRate: 200, // 0.25s
-        rocketCount: 6, // Sends 6 rockets
-        rocketCooldown: 5000,
-        rocketAOERange: 5, // 2 grid AOE range
-        
-        railgunDamage: 25000, // Strongest enemy
-        railgunCooldown: 6000, // 6s cooldown
-        railgunRange: Infinity, // Infinite Range
-        
-        knockbackCooldown: 6000, // 8s cooldown for knockback
-        knockbackExplosionRange: 3,
-        knockbackExplosionDamage: 5000,
-        knockbackDirectDamage: 10000,
-        knockbackPower: 5, // Knockback 5 grids
-        
-        isBossKnockbacker: true
-    },
-};
 
 // Enemy Types and Waves are now loaded from separate files (enemies.js and waves.js)
 // This keeps the codebase organized and manageable
@@ -599,7 +222,7 @@ const SUMMON_TYPES = {
 function initGame() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    
+
     // Handle fullscreen changes
     document.addEventListener('fullscreenchange', resizeCanvas);
     document.addEventListener('webkitfullscreenchange', resizeCanvas);
@@ -609,13 +232,13 @@ function initGame() {
     setupEventListeners();
     updateCashDisplay();
     updateTowerButtonCosts();
-    
+
     // Hide game UI initially, show mode selection
     topHUD.style.display = 'none';
     towerPanel.style.display = 'none';
     towerInfoPanel.style.display = 'none';
     gameModeUI.style.display = 'flex';
-    
+
     requestAnimationFrame(gameLoop);
 }
 
@@ -624,23 +247,23 @@ function resizeCanvas() {
     // Set fixed canvas size for consistency across all devices
     canvas.width = 1400;
     canvas.height = 900;
-    
+
     // Don't change game dimensions if game is active
     if (waveNumber > 0 || towers.length > 0) {
         // Keep original dimensions but update canvas size
         // This ensures rendering stays consistent
         return;
     }
-    
+
     // Snap game dimensions to grid size for perfect alignment
     gameWidth = Math.floor(canvas.width / GRID_SIZE) * GRID_SIZE;
     gameHeight = Math.floor(canvas.height / GRID_SIZE) * GRID_SIZE;
     gridWidth = Math.floor(gameWidth / GRID_SIZE);
     gridHeight = Math.floor(gameHeight / GRID_SIZE);
-    
+
     createGrid();
     createPath();
-    
+
     // Reposition UI elements
     repositionUI();
 }
@@ -668,7 +291,7 @@ function createPath() {
     gameGrid.forEach(row => row.forEach(cell => {
         if (cell.type === 'path') cell.type = 'empty';
     }));
-    
+
     path = currentMap.createPath(gridWidth, gridHeight);
 }
 
@@ -719,7 +342,7 @@ function setupEventListeners() {
     towerButtons.executive.addEventListener('click', () => selectTowerType(TOWER_TYPES.EXECUTIVE));
     towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY)); // Added Cube Factory
 
-    
+
     // Canvas interactions
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('mousemove', handleMouseMove);
@@ -728,12 +351,12 @@ function setupEventListeners() {
         selectedTower = null;
         updateTowerSelection();
     });
-    
+
     // Game controls
     nextWaveBtn.addEventListener('click', startNextWave);
     skipWaveBtn.addEventListener('click', skipWave);
     menuBtn.addEventListener('click', showMainMenu);
-    
+
     // Tower panel toggle button
     toggleTowerPanelBtn.addEventListener('click', () => {
         if (towerPanel.style.display === 'none' || towerPanel.style.display === '') {
@@ -745,7 +368,7 @@ function setupEventListeners() {
             updateTowerSelection();
         }
     });
-    
+
     // Tower panel close button
     closeTowerPanelBtn.addEventListener('click', () => {
         towerPanel.style.display = 'none';
@@ -753,7 +376,7 @@ function setupEventListeners() {
         selectedCell = null;
         updateTowerSelection();
     });
-    
+
     // Tower info panel
     closeTowerInfo.addEventListener('click', () => {
         towerInfoPanel.style.display = 'none';
@@ -761,24 +384,24 @@ function setupEventListeners() {
         currentInfoTower = null;
         selectedCell = null; // Clear selected cell to hide range
     });
-    
+
     // Tower action buttons (using same pattern as cheat buttons)
     upgradeTowerBtn.addEventListener('click', () => {
         if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
             upgradeTower(window.currentSelectedTower);
         }
     });
-    
+
     sellTowerBtn.addEventListener('click', () => {
         if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
             sellTower(window.currentSelectedTower);
         }
     });
-    
+
     abilityTowerBtn.addEventListener('click', () => {
         if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
             const tower = window.currentSelectedTower;
-            
+
             if (tower.type === TOWER_TYPES.ELITE_SPAWNER) {
                 triggerRainbowCube(tower);
             } else if (tower.type === TOWER_TYPES.EXECUTIVE) {
@@ -790,32 +413,32 @@ function setupEventListeners() {
             }
         }
     });
-    
+
     ability2TowerBtn.addEventListener('click', () => {
         if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
             const tower = window.currentSelectedTower;
-            
+
             if (tower.type === TOWER_TYPES.GUNNER_PARAGON) {
                 triggerParagonBeta(tower);
             }
         }
     });
-    
+
     // Cheat menu
     cheatMenuBtn.addEventListener('click', () => {
         cheatModal.classList.remove('hidden');
     });
-    
+
     closeCheatModal.addEventListener('click', () => {
         cheatModal.classList.add('hidden');
     });
-    
+
     cheatModal.addEventListener('click', (e) => {
         if (e.target === cheatModal) {
             cheatModal.classList.add('hidden');
         }
     });
-    
+
     // Cheat buttons
     addMoneyBtn.addEventListener('click', () => { cash += 10000; updateCashDisplay(); });
     addLivesBtn.addEventListener('click', () => { baseHp += 50; baseHpDisplay.textContent = baseHp; });
@@ -848,31 +471,31 @@ function setupEventListeners() {
         gameSpeed = gameSpeed === 1 ? 2 : 1;
         speedUpBtn.textContent = gameSpeed === 2 ? '⚡ Speed: x2' : '⚡ Speed x2';
     });
-    
+
     const spawnDummyBtn = document.getElementById('spawnDummyBtn');
     spawnDummyBtn.addEventListener('click', () => {
-    // Spawn test dummy at center of map
-    const dummy = {
-        type: ENEMY_TYPES.test_dummy,
-        hp: ENEMY_TYPES.test_dummy.baseHp,
-        maxHp: ENEMY_TYPES.test_dummy.baseHp,
-        shield: 0,
-        maxShield: 0,
-        x: gameWidth / 2,
-        y: gameHeight / 2,
-        distanceTraveled: 0,
-        size: ENEMY_TYPES.test_dummy.size,
-        isSummon: false,
-        spawnTime: performance.now(),  // Make sure this is set
-        damageReceived: 0
-    };
-    enemies.push(dummy);
-    console.log('Test Dummy spawned! 10M HP - Track your DPS!');
-});
+        // Spawn test dummy at center of map
+        const dummy = {
+            type: ENEMY_TYPES.test_dummy,
+            hp: ENEMY_TYPES.test_dummy.baseHp,
+            maxHp: ENEMY_TYPES.test_dummy.baseHp,
+            shield: 0,
+            maxShield: 0,
+            x: gameWidth / 2,
+            y: gameHeight / 2,
+            distanceTraveled: 0,
+            size: ENEMY_TYPES.test_dummy.size,
+            isSummon: false,
+            spawnTime: performance.now(),  // Make sure this is set
+            damageReceived: 0
+        };
+        enemies.push(dummy);
+        console.log('Test Dummy spawned! 10M HP - Track your DPS!');
+    });
 
     setWaveBtn.addEventListener('click', () => {
         const newWave = parseInt(waveInput.value);
-        if (newWave >= 1 && newWave <= 100) {
+        if (newWave >= 1 && newWave <= 1000000) {
             waveNumber = newWave - 1;
             waveDisplay.textContent = waveNumber;
         }
@@ -884,11 +507,11 @@ function setupEventListeners() {
             updateCashDisplay();
         }
     });
-    
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         if (gameModeUI.style.display !== 'none') return;
-        
+
         // ESC key to cancel placement or close tower panel
         if (e.key === 'Escape') {
             if (selectedTower) {
@@ -900,7 +523,7 @@ function setupEventListeners() {
             }
             return;
         }
-        
+
         // T key to toggle tower panel
         if (e.key === 't' || e.key === 'T') {
             if (towerPanel.style.display === 'none' || towerPanel.style.display === '') {
@@ -913,55 +536,55 @@ function setupEventListeners() {
             }
             return;
         }
-        
-        // Number keys for tower selection
-     // Number keys for tower selection
-    if (e.key >= '1' && e.key <= '9') {
-        const towerTypes = [
-            TOWER_TYPES.GUNNER,
-            TOWER_TYPES.SNIPER,
-            TOWER_TYPES.ROCKETER,
-            TOWER_TYPES.RAYGUNNER,
-            TOWER_TYPES.RAILGUNNER,
-            TOWER_TYPES.SUMMONER,
-            TOWER_TYPES.FARM,
-            TOWER_TYPES.ELITE_SPAWNER,
-            TOWER_TYPES.COMMANDER
-        ];
-        selectTowerType(towerTypes[parseInt(e.key) - 1]);
-    } else if (e.key === '0') { // Hotkey for Executive
-        selectTowerType(TOWER_TYPES.EXECUTIVE);
-    } else if (e.key === 'c' || e.key === 'C') { // Hotkey for Cube Factory
-        selectTowerType(TOWER_TYPES.CUBE_FACTORY);
-    }
 
-        
+        // Number keys for tower selection
+        // Number keys for tower selection
+        if (e.key >= '1' && e.key <= '9') {
+            const towerTypes = [
+                TOWER_TYPES.GUNNER,
+                TOWER_TYPES.SNIPER,
+                TOWER_TYPES.ROCKETER,
+                TOWER_TYPES.RAYGUNNER,
+                TOWER_TYPES.RAILGUNNER,
+                TOWER_TYPES.SUMMONER,
+                TOWER_TYPES.FARM,
+                TOWER_TYPES.ELITE_SPAWNER,
+                TOWER_TYPES.COMMANDER
+            ];
+            selectTowerType(towerTypes[parseInt(e.key) - 1]);
+        } else if (e.key === '0') { // Hotkey for Executive
+            selectTowerType(TOWER_TYPES.EXECUTIVE);
+        } else if (e.key === 'c' || e.key === 'C') { // Hotkey for Cube Factory
+            selectTowerType(TOWER_TYPES.CUBE_FACTORY);
+        }
+
+
         // Escape to cancel selection
         if (e.key === 'Escape') {
             selectedTower = null;
             updateTowerSelection();
         }
     });
-    
+
     // Game mode UI listeners
-    modeSelect.addEventListener('change', function() {
+    modeSelect.addEventListener('change', function () {
         currentGameMode = GAME_MODES[this.value];
     });
-    
-    mapSelect.addEventListener('change', function() {
+
+    mapSelect.addEventListener('change', function () {
         currentMap = MAP_TYPES[this.value];
     });
-    
+
     closeMenuBtn.addEventListener('click', closeMenu);
-    
-    startGameBtn.addEventListener('click', function() {
+
+    startGameBtn.addEventListener('click', function () {
         gameModeUI.style.display = 'none';
         topHUD.style.display = 'flex';
         towerPanel.style.display = 'flex';
-        
+
         // Display current mode
         modeDisplay.textContent = `${currentGameMode.name} - ${currentMap.name}`;
-        
+
         // Reset game with new settings
         resetGame(true);
     });
@@ -980,7 +603,7 @@ function showMainMenu() {
     }
     towerInfoPanel.style.display = 'none';
     cheatModal.classList.add('hidden');
-    
+
     // Reset game state
     resetGame(false);
 }
@@ -1049,7 +672,7 @@ function selectTowerType(towerType) {
     if (towerType === TOWER_TYPES.GUNNER_PARAGON) {
         return;
     }
-    
+
     // Check tower limit if it has one
     if (towerType.limit) {
         const currentCount = towers.filter(t => t.type === towerType).length;
@@ -1057,14 +680,14 @@ function selectTowerType(towerType) {
             return;
         }
     }
-    
+
     // Calculate actual cost (Gunner cost increases 5% per existing Gunner)
     let actualCost = towerType.cost;
     if (towerType === TOWER_TYPES.GUNNER) {
         const gunnerCount = towers.filter(t => t.type === TOWER_TYPES.GUNNER).length;
         actualCost = Math.floor(towerType.cost * Math.pow(1.05, gunnerCount));
     }
-    
+
     if (cash >= actualCost) {
         selectedTower = towerType;
         selectedTowerCost = actualCost; // Store actual cost
@@ -1079,14 +702,14 @@ function handleCanvasClick(event) {
     const mouseY = event.clientY - rect.top;
     const gridX = Math.floor(mouseX / GRID_SIZE);
     const gridY = Math.floor(mouseY / GRID_SIZE);
-    
+
     // Check if clicking HP bar toggle button
     if (hpBarToggleRect && mouseX >= hpBarToggleRect.x && mouseX <= hpBarToggleRect.x + hpBarToggleRect.width &&
         mouseY >= hpBarToggleRect.y && mouseY <= hpBarToggleRect.y + hpBarToggleRect.height) {
         hpBarCollapsed = !hpBarCollapsed;
         return;
     }
-    
+
     // Handle orbital strike targeting
     if (orbitalStrikeActive) {
         executeOrbitalStrike(mouseX, mouseY);
@@ -1094,7 +717,7 @@ function handleCanvasClick(event) {
         canvas.style.cursor = 'default';
         return;
     }
-    
+
     const clickedTower = towers.find(t => t.gridX === gridX && t.gridY === gridY);
 
     if (clickedTower) {
@@ -1118,10 +741,14 @@ function handleMouseMove(event) {
 
     // If in orbital strike mode, update targeting position
     if (orbitalStrikeActive) {
+        // Snap to grid center
+        const snappedX = Math.floor(mouseX / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+        const snappedY = Math.floor(mouseY / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+
         orbitalStrikeData = {
-            x: mouseX,
-            y: mouseY,
-            range: 200,
+            x: snappedX,
+            y: snappedY,
+            range: GRID_SIZE * 3,
             isTargeting: true
         };
         return;
@@ -1139,7 +766,7 @@ function handleMouseMove(event) {
             const distance = Math.sqrt(dx * dx + dy * dy);
             return distance <= e.type.size / 2;
         });
-        
+
         // Check if hovering over a tower
         const hoveredTower = towers.find(t => t.gridX === gridX && t.gridY === gridY);
         if (hoveredTower || hoveredEnemy) {
@@ -1156,11 +783,11 @@ function showTowerInfo(tower) {
     window.currentSelectedTower = tower;
     currentInfoTower = tower;
     lastTowerInfoUpdate = performance.now();
-    
+
     const level = tower.level;
     const type = tower.type;
     const currentStats = type.levels[level - 1];
-    
+
     // Build info HTML
     let infoHTML = `
         <div class="info-row">
@@ -1168,7 +795,7 @@ function showTowerInfo(tower) {
             <div class="info-value">${type.name} (Level ${level}/${type.levels.length})</div>
         </div>
     `;
-    
+
     // Add stats based on tower type
     if (type.support) {
         // Commander tower - show buff stats
@@ -1209,11 +836,11 @@ function showTowerInfo(tower) {
         const buffedDamage = Math.floor(currentStats.damage * (1 + buffs.damageBoost));
         const buffedRange = currentStats.range + buffs.rangeBoost + rangeBonus;
         const buffedFireRate = currentStats.fireRate * (1 - buffs.fireRateBoost);
-        
+
         // Check if Alpha is active
         const alphaActive = tower.alphaActive && (performance.now() - tower.alphaStartTime < 15000);
         const currentBaseHp = alphaActive ? currentStats.baseHp * tower.alphaMultiplier : currentStats.baseHp;
-        
+
         infoHTML += `
             <div class="info-row">
                 <div class="info-label">Damage</div>
@@ -1259,7 +886,7 @@ function showTowerInfo(tower) {
         const buffedDamage = Math.floor(currentStats.damage * (1 + buffs.damageBoost));
         const buffedRange = currentStats.range + buffs.rangeBoost;
         const buffedFireRate = currentStats.fireRate * (1 - buffs.fireRateBoost);
-        
+
         infoHTML += `
             <div class="info-row">
                 <div class="info-label">Damage</div>
@@ -1273,8 +900,12 @@ function showTowerInfo(tower) {
                 <div class="info-label">Fire Rate</div>
                 <div class="info-value">${(buffedFireRate / 1000).toFixed(2)}s${buffs.fireRateBoost > 0 ? ` (-${(buffs.fireRateBoost * 100).toFixed(0)}%)` : ''}</div>
             </div>
+            <div class="info-row">
+                <div class="info-label">DPS</div>
+                <div class="info-value">${((buffedDamage / buffedFireRate) * 1000).toFixed(1)}/s</div>
+            </div>
         `;
-        
+
         // Show Gunner Paragon info
         if (type === TOWER_TYPES.GUNNER_PARAGON) {
             infoHTML += `
@@ -1289,7 +920,7 @@ function showTowerInfo(tower) {
             `;
         }
     }
-    
+
     // Show next level info if not max
     if (level < type.levels.length) {
         const nextStats = type.levels[level];
@@ -1316,13 +947,13 @@ function showTowerInfo(tower) {
     } else {
         infoHTML += `<div class="info-row"><div class="info-value" style="text-align:center; color:#4CAF50;">✓ MAX LEVEL</div></div>`;
     }
-    
+
     towerInfoContent.innerHTML = infoHTML;
-    
+
     // Update button states
     const upgradeCost = level < type.levels.length ? (freeUpgrades ? 0 : type.levels[level].upgradeCost) : 0;
     const canUpgrade = level < type.levels.length && (freeUpgrades || cash >= upgradeCost);
-    
+
     // Special text for Gunner level 4 upgrade to Paragon
     if (type === TOWER_TYPES.GUNNER && level === 4) {
         let radianText = 'R1';
@@ -1355,14 +986,14 @@ function showTowerInfo(tower) {
         upgradeTowerBtn.disabled = !canUpgrade;
         upgradeTowerBtn.style.display = level < type.levels.length ? 'block' : 'none';
     }
-    
+
     sellTowerBtn.textContent = `💰 Sell ($${Math.floor(type.cost * 0.6 * (level / 2))})`;
-    
+
     // Show ability button for Elite Spawner level 5
     if (type === TOWER_TYPES.ELITE_SPAWNER && level === 5) {
         // Elite Spawner Rainbow Cube ability
         const cooldownRemaining = Math.max(0, (TOWER_TYPES.ELITE_SPAWNER.abilityCooldown - (performance.now() - lastAbilityTime)) / 1000);
-        
+
         if (cooldownRemaining > 0) {
             abilityTowerBtn.textContent = `🌈 Spawn Rainbow Cube (${cooldownRemaining.toFixed(1)}s)`;
             abilityTowerBtn.disabled = true;
@@ -1379,7 +1010,7 @@ function showTowerInfo(tower) {
         const cooldownRemaining = Math.max(0, (TOWER_TYPES.EXECUTIVE.abilityCooldown - (performance.now() - (tower.lastAbilityTime || 0))) / 1000);
         const globalCooldownRemaining = Math.max(0, (40000 - (performance.now() - lastOrbitalStrikeTime)) / 1000);
         const canAfford = cash >= abilityCost;
-        
+
         if (cooldownRemaining > 0) {
             abilityTowerBtn.textContent = `🛰️ Orbital Strike (${cooldownRemaining.toFixed(1)}s)`;
             abilityTowerBtn.disabled = true;
@@ -1404,7 +1035,7 @@ function showTowerInfo(tower) {
         const alphaCooldown = type.alphaCooldown;
         const cooldownRemaining = Math.max(0, (alphaCooldown - (performance.now() - (tower.lastAlphaTime || 0))) / 1000);
         const canAfford = cash >= alphaCost;
-        
+
         if (cooldownRemaining > 0) {
             abilityTowerBtn.textContent = `⚡ Alpha Protocol (${cooldownRemaining.toFixed(1)}s)`;
             abilityTowerBtn.disabled = true;
@@ -1418,14 +1049,14 @@ function showTowerInfo(tower) {
             abilityTowerBtn.disabled = false;
             abilityTowerBtn.style.display = 'block';
         }
-        
+
         // Beta Protocol (Radian 3 only)
         if (level === 3) {
             const betaCost = type.betaCost;
             const betaCooldown = type.betaCooldown;
             const betaCooldownRemaining = Math.max(0, (betaCooldown - (performance.now() - (tower.lastBetaTime || 0))) / 1000);
             const canAffordBeta = cash >= betaCost;
-            
+
             if (betaCooldownRemaining > 0) {
                 ability2TowerBtn.textContent = `🔷 Beta Protocol (${betaCooldownRemaining.toFixed(1)}s)`;
                 ability2TowerBtn.disabled = true;
@@ -1446,11 +1077,11 @@ function showTowerInfo(tower) {
         abilityTowerBtn.style.display = 'none';
         ability2TowerBtn.style.display = 'none';
     }
-    
+
     // Show the panel and buttons
     towerInfoPanel.style.display = 'flex';
     towerActions.style.display = 'block';
-    
+
     // Store selected tower for timer display
     selectedTowerForTimer = tower;
 }
@@ -1497,7 +1128,7 @@ function sellTower(tower) {
     if (tower.type === TOWER_TYPES.EXECUTIVE) {
         lastOrbitalStrikeTime = Math.max(lastOrbitalStrikeTime, performance.now() - 20000); // Add 20s penalty
     }
-    
+
     // Cash refund
     cash += Math.floor(tower.type.cost * 0.6 * (tower.level / 2));
     updateCashDisplay();
@@ -1531,28 +1162,28 @@ function upgradeTower(tower) {
             alert(`Not enough cash! Need $${paragonCost}`);
             return;
         }
-        
+
         // Store position before selling
         const gridX = tower.gridX;
         const gridY = tower.gridY;
-        
+
         // Check if there's space for 2x2 tower at this position
         for (let y = gridY; y < gridY + 2; y++) {
             for (let x = gridX; x < gridX + 2; x++) {
-                if (x >= gridWidth || y >= gridHeight || 
-                    gameGrid[y][x].type === 'path' || 
+                if (x >= gridWidth || y >= gridHeight ||
+                    gameGrid[y][x].type === 'path' ||
                     (gameGrid[y][x].tower && gameGrid[y][x].tower !== tower)) {
                     alert('Not enough space to upgrade to Paragon! Need 2x2 clear area.');
                     return;
                 }
             }
         }
-        
+
         // Determine radian based on points
         let radian = 1;
         if (gunnerPoints >= 250) radian = 3;
         else if (gunnerPoints >= 100) radian = 2;
-        
+
         // Sell all gunners (including this one)
         const gunnerTowers = towers.filter(t => t.type === TOWER_TYPES.GUNNER);
         gunnerTowers.forEach(t => {
@@ -1562,48 +1193,48 @@ function upgradeTower(tower) {
         });
         // Remove from towers array
         towers = towers.filter(t => t.type !== TOWER_TYPES.GUNNER);
-        
-// Create new Paragon tower (like placing a new tower)
-const paragonTower = {
-    gridX: gridX,
-    gridY: gridY,
-    x: gridX * GRID_SIZE + GRID_SIZE / 2,
-    y: gridY * GRID_SIZE + GRID_SIZE / 2,
-    type: TOWER_TYPES.GUNNER_PARAGON,
-    level: radian,
-    lastFired: 0,
-    target: null,
-    lastSummonTimes: {},
-    isFiring: false
-};
 
-// Add to towers array
-towers.push(paragonTower);
+        // Create new Paragon tower (like placing a new tower)
+        const paragonTower = {
+            gridX: gridX,
+            gridY: gridY,
+            x: gridX * GRID_SIZE + GRID_SIZE / 2,
+            y: gridY * GRID_SIZE + GRID_SIZE / 2,
+            type: TOWER_TYPES.GUNNER_PARAGON,
+            level: radian,
+            lastFired: 0,
+            target: null,
+            lastSummonTimes: {},
+            isFiring: false
+        };
 
-// Apply HP buff
-const stats = TOWER_TYPES.GUNNER_PARAGON.levels[radian - 1];
-baseHp += stats.baseHp;
-baseHpDisplay.textContent = baseHp;
+        // Add to towers array
+        towers.push(paragonTower);
 
-// Occupy 2x2 grid space
-for (let y = gridY; y < gridY + 2; y++) {
-    for (let x = gridX; x < gridX + 2; x++) {
-        gameGrid[y][x].tower = paragonTower;
+        // Apply HP buff
+        const stats = TOWER_TYPES.GUNNER_PARAGON.levels[radian - 1];
+        baseHp += stats.baseHp;
+        baseHpDisplay.textContent = baseHp;
+
+        // Occupy 2x2 grid space
+        for (let y = gridY; y < gridY + 2; y++) {
+            for (let x = gridX; x < gridX + 2; x++) {
+                gameGrid[y][x].tower = paragonTower;
+            }
+        }
+
+        // Deduct cost and update counters
+        cash -= paragonCost;
+        gunnerParagonCount++;
+        gunnerPoints = 0;
+
+        updateCashDisplay();
+        towerInfoPanel.style.display = 'none';
+        console.log(`Gunner Paragon created at Radian ${radian}! Base HP +${stats.baseHp}`);
+        return;
+
     }
-}
 
-// Deduct cost and update counters
-cash -= paragonCost;
-gunnerParagonCount++;
-gunnerPoints = 0;
-
-updateCashDisplay();
-towerInfoPanel.style.display = 'none';
-console.log(`Gunner Paragon created at Radian ${radian}! Base HP +${stats.baseHp}`);
-return;
-
-    }
-    
     // Check if this is a Sniper at level 5 trying to upgrade to Paragon
     if (tower.type === TOWER_TYPES.SNIPER && tower.level === tower.type.levels.length) {
         const paragonCost = TOWER_TYPES.SNIPER_PARAGON.cost;
@@ -1615,29 +1246,29 @@ return;
             alert(`Not enough cash! Need $${paragonCost}`);
             return;
         }
-        
+
         // Store position before selling
         const gridX = tower.gridX;
         const gridY = tower.gridY;
-        
+
         // Check if there's space for 2x2 tower at this position
         for (let y = gridY; y < gridY + 2; y++) {
             for (let x = gridX; x < gridX + 2; x++) {
-                if (x >= gridWidth || y >= gridHeight || 
-                    gameGrid[y][x].type === 'path' || 
+                if (x >= gridWidth || y >= gridHeight ||
+                    gameGrid[y][x].type === 'path' ||
                     (gameGrid[y][x].tower && gameGrid[y][x].tower !== tower)) {
                     alert('Not enough space to upgrade to Paragon! Need 2x2 clear area.');
                     return;
                 }
             }
         }
-        
+
         // Count snipers to determine radian
         const sniperCount = towers.filter(t => t.type === TOWER_TYPES.SNIPER).length;
         let radian = 1;
         if (sniperCount >= 15) radian = 3;
         else if (sniperCount >= 8) radian = 2;
-        
+
         // Sell all snipers (including this one)
         const sniperTowers = towers.filter(t => t.type === TOWER_TYPES.SNIPER);
         sniperTowers.forEach(t => {
@@ -1645,7 +1276,7 @@ return;
             if (gridCell) gridCell.tower = null;
         });
         towers = towers.filter(t => t.type !== TOWER_TYPES.SNIPER);
-        
+
         // Create new Sniper Paragon tower
         const paragonTower = {
             gridX: gridX,
@@ -1658,25 +1289,25 @@ return;
             target: null,
             isFiring: false
         };
-        
+
         towers.push(paragonTower);
-        
+
         // Occupy 2x2 grid space
         for (let y = gridY; y < gridY + 2; y++) {
             for (let x = gridX; x < gridX + 2; x++) {
                 gameGrid[y][x].tower = paragonTower;
             }
         }
-        
+
         cash -= paragonCost;
         sniperParagonCount++;
-        
+
         updateCashDisplay();
         towerInfoPanel.style.display = 'none';
         console.log(`Sniper Paragon created at Radian ${radian}!`);
         return;
     }
-    
+
     const nextLevel = tower.level;
     const upgradeCost = freeUpgrades ? 0 : tower.type.levels[nextLevel].upgradeCost;
     if (nextLevel < tower.type.levels.length && (freeUpgrades || cash >= upgradeCost)) {
@@ -1686,42 +1317,42 @@ return;
         tower.level++;
         tower.lastSummonTimes = {}; // Reset individual summon timers on upgrade
 
-               // Instant spawn for Cube Factory on upgrade
-            if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
-                const newLevelStats = tower.type.levels[tower.level - 1]; // Get stats for the new level
-                const spawnUnitType = newLevelStats.summons[0].type;
+        // Instant spawn for Cube Factory on upgrade
+        if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
+            const newLevelStats = tower.type.levels[tower.level - 1]; // Get stats for the new level
+            const spawnUnitType = newLevelStats.summons[0].type;
 
-                const activeFactoryCubes = enemies.filter(e =>
-                    e.type.name.includes('Factory Cube') && e.hp > 0
-                ).length;
-                
-                // Instant spawn if there are less than max active summons
-                if (activeFactoryCubes < TOWER_TYPES.CUBE_FACTORY.maxActiveSummons) {
-                    console.log("[DEBUG CF] Cube Factory upgraded. Spawning initial unit instantly.");
-                    spawnEntity(SUMMON_TYPES[spawnUnitType], tower.x, tower.y, true);
-                    tower.lastSummonTimes[spawnUnitType] = performance.now(); // Set individual tower's cooldown start
-                    lastGlobalFactorySpawnTime = performance.now(); // Reset global cooldown
-                } else {
-                    // If no instant spawn, just ensure its individual timer is current
-                    console.log("[DEBUG CF] Cube Factory upgraded, but no instant spawn (max active reached). Setting individual timer to now.");
-                    tower.lastSummonTimes[spawnUnitType] = performance.now();
-                }
+            const activeFactoryCubes = enemies.filter(e =>
+                e.type.name.includes('Factory Cube') && e.hp > 0
+            ).length;
 
-                // Reduce global cooldown on upgrade (this is separate from instant spawn)
-                lastGlobalFactorySpawnTime += TOWER_TYPES.CUBE_FACTORY.cooldownReductionOnUpgrade;
-                lastGlobalFactorySpawnTime = Math.min(performance.now(), lastGlobalFactorySpawnTime); // Ensure it doesn't go into the future
+            // Instant spawn if there are less than max active summons
+            if (activeFactoryCubes < TOWER_TYPES.CUBE_FACTORY.maxActiveSummons) {
+                console.log("[DEBUG CF] Cube Factory upgraded. Spawning initial unit instantly.");
+                spawnEntity(SUMMON_TYPES[spawnUnitType], tower.x, tower.y, true);
+                tower.lastSummonTimes[spawnUnitType] = performance.now(); // Set individual tower's cooldown start
+                lastGlobalFactorySpawnTime = performance.now(); // Reset global cooldown
+            } else {
+                // If no instant spawn, just ensure its individual timer is current
+                console.log("[DEBUG CF] Cube Factory upgraded, but no instant spawn (max active reached). Setting individual timer to now.");
+                tower.lastSummonTimes[spawnUnitType] = performance.now();
             }
-            
-            // Track gunner points
-            if (tower.type === TOWER_TYPES.GUNNER) {
-                const points = [1, 2, 3, 5];
-                gunnerPoints += points[tower.level - 1] || 0;
-            }
-            
-            updateCashDisplay();
-            showTowerInfo(tower);
+
+            // Reduce global cooldown on upgrade (this is separate from instant spawn)
+            lastGlobalFactorySpawnTime += TOWER_TYPES.CUBE_FACTORY.cooldownReductionOnUpgrade;
+            lastGlobalFactorySpawnTime = Math.min(performance.now(), lastGlobalFactorySpawnTime); // Ensure it doesn't go into the future
         }
-   }
+
+        // Track gunner points
+        if (tower.type === TOWER_TYPES.GUNNER) {
+            const points = [1, 2, 3, 5];
+            gunnerPoints += points[tower.level - 1] || 0;
+        }
+
+        updateCashDisplay();
+        showTowerInfo(tower);
+    }
+}
 
 function placeTower(gridX, gridY) {
     console.log(`--- Attempting Placement for ${selectedTower ? selectedTower.name : 'Unknown Tower'} ---`);
@@ -1844,34 +1475,34 @@ function getCommanderBuffs(tower) {
     let rangeBoost = 0;
     let fireRateBoost = 0;
     let damageBoost = 0;
-    
+
     // Find all Commander towers
     const commanders = towers.filter(t => t.type === TOWER_TYPES.COMMANDER);
-    
+
     for (const commander of commanders) {
         const commanderStats = commander.type.levels[commander.level - 1];
         const distance = Math.sqrt(Math.pow(tower.x - commander.x, 2) + Math.pow(tower.y - commander.y, 2)) / GRID_SIZE;
-        
+
         if (distance <= commanderStats.range) {
             rangeBoost = Math.max(rangeBoost, commanderStats.rangeBoost);
             fireRateBoost = Math.max(fireRateBoost, commanderStats.fireRateBoost);
             damageBoost = Math.max(damageBoost, commanderStats.damageBoost);
         }
     }
-    
+
     return { rangeBoost, fireRateBoost, damageBoost };
 }
 
 // Get Sniper Paragon buffs
 function getSniperParagonBuffs(tower) {
     let damageBoost = 0;
-    
+
     // Find Sniper Paragon at Radian 3
     const sniperParagon = towers.find(t => t.type === TOWER_TYPES.SNIPER_PARAGON && t.level === 3);
-    
+
     if (sniperParagon) {
         const stats = sniperParagon.type.levels[2];
-        
+
         // Apply buff to Snipers
         if (tower.type === TOWER_TYPES.SNIPER) {
             damageBoost = stats.sniperBuff || 0;
@@ -1881,48 +1512,83 @@ function getSniperParagonBuffs(tower) {
             damageBoost = stats.railgunnerBuff || 0;
         }
     }
-    
+
     return damageBoost;
 }
 
 // Execute orbital strike at target location
 function executeOrbitalStrike(x, y) {
-    const strikeRange = 200;
-    
+    const strikeRange = GRID_SIZE * 3; // 3 grids on each side = 120 pixels
+
+    // Snap to grid - find nearest grid center
+    const gridX = Math.floor(x / GRID_SIZE);
+    const gridY = Math.floor(y / GRID_SIZE);
+    const snappedX = gridX * GRID_SIZE + GRID_SIZE / 2;
+    const snappedY = gridY * GRID_SIZE + GRID_SIZE / 2;
+
     // Create targeting indicator that appears immediately
     orbitalStrikeData = {
-        x: x,
-        y: y,
+        x: snappedX,
+        y: snappedY,
         range: strikeRange,
         startTime: performance.now(),
         impactTime: performance.now() + 2000, // 2 second delay before impact
         hasImpacted: false
     };
-    
+
     console.log('Orbital Strike targeting...');
 }
 
-// Update and render orbital strike
+// ===== ORBITAL STRIKE STAT CONFIGURATION =====
+// These values control the Orbital Strike ability damage
+const ORBITAL_STRIKE_STATS = {
+    INITIAL_BURST_DAMAGE: 7500,      // First hit damage
+    DELAYED_BURST_DAMAGE: 2500,      // Damage after 1 second
+    CLUSTER_TICK_DAMAGE: 300,        // Damage per cluster explosion
+    FINAL_EXPLOSION_DAMAGE: 10000,   // Final massive explosion damage
+
+    MAX_HP_BONUS_PERCENT: 0.01,      // 1% of enemy max HP as bonus damage
+    MAX_HP_BONUS_CAP: 10000,         // Cap for non-endless modes
+
+    CLUSTER_TICKS: 125,              // Number of cluster explosions
+    CLUSTER_INTERVAL: 25,            // Milliseconds between clusters
+    DELAYED_BURST_TIME: 1000         // Delay before second burst (ms)
+};
+
+// Helper function to check if a point is within orbital strike square bounds
+function isInSquareBounds(centerX, centerY, pointX, pointY, range) {
+    const dx = Math.abs(pointX - centerX);
+    const dy = Math.abs(pointY - centerY);
+    return dx <= range && dy <= range;
+}
+
+// Update Orbital Strike
 function updateOrbitalStrike(timestamp) {
     if (!orbitalStrikeData) return;
-    
+
     // If just targeting (no impact time set), show targeting reticle
     if (orbitalStrikeData.isTargeting) {
-        // Draw targeting ring
+        // Draw targeting square preview
         ctx.strokeStyle = '#FF0000';
         ctx.lineWidth = 3;
         ctx.setLineDash([10, 5]);
         ctx.beginPath();
-        ctx.arc(orbitalStrikeData.x, orbitalStrikeData.y, orbitalStrikeData.range, 0, 2 * Math.PI);
+        // Draw square with range as the half-width
+        ctx.rect(
+            orbitalStrikeData.x - orbitalStrikeData.range,
+            orbitalStrikeData.y - orbitalStrikeData.range,
+            orbitalStrikeData.range * 2,
+            orbitalStrikeData.range * 2
+        );
         ctx.stroke();
         ctx.setLineDash([]);
-        
+
         // Draw range squares
         ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
         const gridRange = Math.ceil(orbitalStrikeData.range / GRID_SIZE);
         const centerGridX = Math.floor(orbitalStrikeData.x / GRID_SIZE);
         const centerGridY = Math.floor(orbitalStrikeData.y / GRID_SIZE);
-        
+
         for (let dy = -gridRange; dy <= gridRange; dy++) {
             for (let dx = -gridRange; dx <= gridRange; dx++) {
                 const gx = centerGridX + dx;
@@ -1930,14 +1596,16 @@ function updateOrbitalStrike(timestamp) {
                 if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
                     const cellCenterX = gx * GRID_SIZE + GRID_SIZE / 2;
                     const cellCenterY = gy * GRID_SIZE + GRID_SIZE / 2;
-                    const dist = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, cellCenterX, cellCenterY);
-                    if (dist <= orbitalStrikeData.range) {
+                    // Use square bounds check
+                    const dx_dist = Math.abs(cellCenterX - orbitalStrikeData.x);
+                    const dy_dist = Math.abs(cellCenterY - orbitalStrikeData.y);
+                    if (dx_dist <= orbitalStrikeData.range && dy_dist <= orbitalStrikeData.range) {
                         ctx.fillRect(gx * GRID_SIZE, gy * GRID_SIZE, GRID_SIZE, GRID_SIZE);
                     }
                 }
             }
         }
-        
+
         // Draw crosshair
         ctx.strokeStyle = '#FF0000';
         ctx.lineWidth = 2;
@@ -1947,28 +1615,34 @@ function updateOrbitalStrike(timestamp) {
         ctx.moveTo(orbitalStrikeData.x, orbitalStrikeData.y - 20);
         ctx.lineTo(orbitalStrikeData.x, orbitalStrikeData.y + 20);
         ctx.stroke();
-        
+
         return;
     }
-    
+
     // Strike has been fired, show countdown
     const timeToImpact = orbitalStrikeData.impactTime - timestamp;
-    
-    // Draw targeting ring
+
+    // Draw targeting square instead of circle
     ctx.strokeStyle = '#FF0000';
     ctx.lineWidth = 3;
     ctx.setLineDash([10, 5]);
     ctx.beginPath();
-    ctx.arc(orbitalStrikeData.x, orbitalStrikeData.y, orbitalStrikeData.range, 0, 2 * Math.PI);
+    // Draw square with range as the half-width
+    ctx.rect(
+        orbitalStrikeData.x - orbitalStrikeData.range,
+        orbitalStrikeData.y - orbitalStrikeData.range,
+        orbitalStrikeData.range * 2,
+        orbitalStrikeData.range * 2
+    );
     ctx.stroke();
     ctx.setLineDash([]);
-    
+
     // Draw range squares
     ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
     const gridRange = Math.ceil(orbitalStrikeData.range / GRID_SIZE);
     const centerGridX = Math.floor(orbitalStrikeData.x / GRID_SIZE);
     const centerGridY = Math.floor(orbitalStrikeData.y / GRID_SIZE);
-    
+
     for (let dy = -gridRange; dy <= gridRange; dy++) {
         for (let dx = -gridRange; dx <= gridRange; dx++) {
             const gx = centerGridX + dx;
@@ -1976,78 +1650,78 @@ function updateOrbitalStrike(timestamp) {
             if (gx >= 0 && gx < gridWidth && gy >= 0 && gy < gridHeight) {
                 const cellCenterX = gx * GRID_SIZE + GRID_SIZE / 2;
                 const cellCenterY = gy * GRID_SIZE + GRID_SIZE / 2;
-                const dist = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, cellCenterX, cellCenterY);
-                if (dist <= orbitalStrikeData.range) {
+                // Use square distance check instead of circular
+                const dx_dist = Math.abs(cellCenterX - orbitalStrikeData.x);
+                const dy_dist = Math.abs(cellCenterY - orbitalStrikeData.y);
+                if (dx_dist <= orbitalStrikeData.range && dy_dist <= orbitalStrikeData.range) {
                     ctx.fillRect(gx * GRID_SIZE, gy * GRID_SIZE, GRID_SIZE, GRID_SIZE);
                 }
             }
         }
     }
-    
+
     // Draw countdown text
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(`${Math.max(0, (timeToImpact / 1000).toFixed(1))}s`, orbitalStrikeData.x, orbitalStrikeData.y - 20);
-    
+
     // Impact after delay
     if (timestamp >= orbitalStrikeData.impactTime && !orbitalStrikeData.hasImpacted) {
         orbitalStrikeData.hasImpacted = true;
         orbitalStrikeData.clusterTicks = 0;
         orbitalStrikeData.lastClusterTime = timestamp;
-        
+
         // Create massive explosion effect
         explosions.push({
             x: orbitalStrikeData.x,
             y: orbitalStrikeData.y,
             size: 0,
-            maxSize: orbitalStrikeData.range,
+            maxSize: orbitalStrikeData.range * 2, // Match preview square size
             startTime: timestamp,
             duration: 1000
         });
-        
-        // Initial 7500 damage burst (fixed damage to all in range)
+
+        // Initial burst damage (7500 + 1% max HP bonus)
         for (const enemy of enemies) {
-            const distance = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y);
-            if (distance <= orbitalStrikeData.range && !enemy.isSummon) {
-                // Remove cap in endless mode, keep 10k cap in other modes
-                const maxHpBonus = currentGameMode === GAME_MODES.ENDLESS ? 
-                    Math.floor(enemy.maxHp * 0.01) : 
-                    Math.min(Math.floor(enemy.maxHp * 0.01), 10000);
-                const totalDamage = 7500 + maxHpBonus;
+            if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
+                // Calculate bonus damage (1% of max HP, capped in non-endless modes)
+                const maxHpBonus = currentGameMode === GAME_MODES.ENDLESS ?
+                    Math.floor(enemy.maxHp * ORBITAL_STRIKE_STATS.MAX_HP_BONUS_PERCENT) :
+                    Math.min(Math.floor(enemy.maxHp * ORBITAL_STRIKE_STATS.MAX_HP_BONUS_PERCENT), ORBITAL_STRIKE_STATS.MAX_HP_BONUS_CAP);
+                const totalDamage = ORBITAL_STRIKE_STATS.INITIAL_BURST_DAMAGE + maxHpBonus;
                 applyDamage(enemy, totalDamage, 'explosive');
             }
         }
-        
-        // 2500 damage after 1 second (fixed damage to all in range)
+
+        // Delayed burst damage (2500 + 1% max HP bonus after 1 second)
         setTimeout(() => {
             for (const enemy of enemies) {
-                const distance = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y);
-                if (distance <= orbitalStrikeData.range && !enemy.isSummon) {
-                    const maxHpBonus = currentGameMode === GAME_MODES.ENDLESS ? 
-                        Math.floor(enemy.maxHp * 0.01) : 
-                        Math.min(Math.floor(enemy.maxHp * 0.01), 10000);
-                    const totalDamage = 2500 + maxHpBonus;
+                if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
+                    const maxHpBonus = currentGameMode === GAME_MODES.ENDLESS ?
+                        Math.floor(enemy.maxHp * ORBITAL_STRIKE_STATS.MAX_HP_BONUS_PERCENT) :
+                        Math.min(Math.floor(enemy.maxHp * ORBITAL_STRIKE_STATS.MAX_HP_BONUS_PERCENT), ORBITAL_STRIKE_STATS.MAX_HP_BONUS_CAP);
+                    const totalDamage = ORBITAL_STRIKE_STATS.DELAYED_BURST_DAMAGE + maxHpBonus;
                     applyDamage(enemy, totalDamage, 'explosive');
                 }
             }
-        }, 1000);
-        
+        }, ORBITAL_STRIKE_STATS.DELAYED_BURST_TIME);
+
         console.log('Orbital Strike impacted!');
     }
-    
-    // Handle cluster explosions (125 ticks at 0.025s = 25ms intervals)
-    if (orbitalStrikeData.hasImpacted && orbitalStrikeData.clusterTicks < 125) {
-        if (timestamp - orbitalStrikeData.lastClusterTime >= 25) {
+
+    // Handle cluster explosions (125 ticks at 25ms intervals = 3.125 seconds total)
+    if (orbitalStrikeData.hasImpacted && orbitalStrikeData.clusterTicks < ORBITAL_STRIKE_STATS.CLUSTER_TICKS) {
+        if (timestamp - orbitalStrikeData.lastClusterTime >= ORBITAL_STRIKE_STATS.CLUSTER_INTERVAL) {
             orbitalStrikeData.clusterTicks++;
             orbitalStrikeData.lastClusterTime = timestamp;
-            
-            // Random cluster explosion position within strike range
-            const angle = Math.random() * Math.PI * 2;
-            const dist = Math.random() * orbitalStrikeData.range;
-            const clusterX = orbitalStrikeData.x + Math.cos(angle) * dist;
-            const clusterY = orbitalStrikeData.y + Math.sin(angle) * dist;
-            
+
+            // Random cluster explosion position within strike square
+            const randX = (Math.random() * 2 - 1) * orbitalStrikeData.range;
+            const randY = (Math.random() * 2 - 1) * orbitalStrikeData.range;
+            const clusterX = orbitalStrikeData.x + randX;
+            const clusterY = orbitalStrikeData.y + randY;
+
             // Small explosion effect
             explosions.push({
                 x: clusterX,
@@ -2057,21 +1731,20 @@ function updateOrbitalStrike(timestamp) {
                 startTime: timestamp,
                 duration: 200
             });
-            
-            // Deal 300 damage to ALL enemies in main strike range (fixed damage)
+
+            // Deal cluster damage to ALL enemies in main strike square
             for (const enemy of enemies) {
-                const distanceFromCenter = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y);
-                if (distanceFromCenter <= orbitalStrikeData.range && !enemy.isSummon) {
-                    applyDamage(enemy, 300, 'explosive');
+                if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
+                    applyDamage(enemy, ORBITAL_STRIKE_STATS.CLUSTER_TICK_DAMAGE, 'explosive');
                 }
             }
         }
     }
-    
+
     // Final massive explosion after all clusters
-    if (orbitalStrikeData.hasImpacted && orbitalStrikeData.clusterTicks >= 125 && !orbitalStrikeData.finalExplosionDone) {
+    if (orbitalStrikeData.hasImpacted && orbitalStrikeData.clusterTicks >= ORBITAL_STRIKE_STATS.CLUSTER_TICKS && !orbitalStrikeData.finalExplosionDone) {
         orbitalStrikeData.finalExplosionDone = true;
-        
+
         // Massive explosion effect
         explosions.push({
             x: orbitalStrikeData.x,
@@ -2081,17 +1754,16 @@ function updateOrbitalStrike(timestamp) {
             startTime: timestamp,
             duration: 1500
         });
-        
-        // Deal 10000 damage to all in range
+
+        // Deal final massive damage to all in square range
         for (const enemy of enemies) {
-            const distance = calculateDistance(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y);
-            if (distance <= orbitalStrikeData.range && !enemy.isSummon) {
-                applyDamage(enemy, 10000, 'explosive');
+            if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
+                applyDamage(enemy, ORBITAL_STRIKE_STATS.FINAL_EXPLOSION_DAMAGE, 'explosive');
             }
         }
-        
+
         console.log('Orbital Strike final explosion!');
-        
+
         // Clear after final explosion animation
         setTimeout(() => {
             orbitalStrikeData = null;
@@ -2117,7 +1789,7 @@ function triggerOrbitalStrike(tower) {
         const timeSinceLastUse = performance.now() - (tower.lastAbilityTime || 0);
         const globalCooldown = 40000; // 40 second global cooldown
         const timeSinceLastGlobal = performance.now() - lastOrbitalStrikeTime;
-        
+
         if (cash >= abilityCost && timeSinceLastUse >= cooldownTime && timeSinceLastGlobal >= globalCooldown) {
             cash -= abilityCost;
             tower.lastAbilityTime = performance.now();
@@ -2140,20 +1812,20 @@ function triggerParagonAlpha(tower) {
         const alphaCost = tower.type.alphaCost;
         const alphaCooldown = tower.type.alphaCooldown;
         const timeSinceLastUse = performance.now() - (tower.lastAlphaTime || 0);
-        
+
         if (cash >= alphaCost && timeSinceLastUse >= alphaCooldown) {
             const baseHpBonus = stats.baseHp;  // Get the passive bonus (400 or 900)
             const originalHp = BASE_HP + baseHpBonus;  // 100 + 400/900
-            
+
             baseHp = 10000;  // Set to exactly 10,000
             baseHpDisplay.textContent = baseHp;
-            
+
             // Restore original HP after 15 seconds
             setTimeout(() => {
                 baseHp = originalHp;
                 baseHpDisplay.textContent = baseHp;
             }, 15000);
-            
+
             cash -= alphaCost;
             tower.lastAlphaTime = performance.now();
             updateCashDisplay();
@@ -2165,6 +1837,19 @@ function triggerParagonAlpha(tower) {
 
 
 
+// ===== BETA PROTOCOL STAT CONFIGURATION =====
+// Controls the Gunner Paragon L3 Beta Protocol ability spawning
+const BETA_PROTOCOL_STATS = {
+    GRAY_CUBE_COUNT: 20,          // Number of Gray cubes to spawn
+    GRAY_CUBE_INTERVAL: 2000,     // Spawn interval (ms)
+
+    BLACK_CUBE_COUNT: 10,         // Number of Black cubes to spawn  
+    BLACK_CUBE_INTERVAL: 3000,    // Spawn interval (ms)
+
+    YELLOW_CUBE_COUNT: 5,         // Number of Yellow cubes to spawn
+    YELLOW_CUBE_INTERVAL: 5000    // Spawn interval (ms)
+};
+
 // Trigger Paragon Beta ability
 function triggerParagonBeta(tower) {
     if (tower.type === TOWER_TYPES.GUNNER_PARAGON && tower.level === 3) {
@@ -2172,42 +1857,42 @@ function triggerParagonBeta(tower) {
         const betaCost = tower.type.betaCost;
         const betaCooldown = tower.type.betaCooldown;
         const timeSinceLastUse = performance.now() - (tower.lastBetaTime || 0);
-        
+
         if (cash >= betaCost && timeSinceLastUse >= betaCooldown) {
-            // Spawn Beta Protocol cubes
-            // 20x Gray cubes
-            for (let i = 0; i < 20; i++) {
+            // Spawn Beta Protocol cubes based on configuration
+            // Gray cubes (20 total, every 2 seconds)
+            for (let i = 0; i < BETA_PROTOCOL_STATS.GRAY_CUBE_COUNT; i++) {
                 const timeoutId = setTimeout(() => {
                     if (waveActive) { // Only spawn if game is still active
                         const grayHp = SUMMON_TYPES.BETA_GRAY.hp + stats.baseHp;
                         const grayCube = { ...SUMMON_TYPES.BETA_GRAY, hp: grayHp };
                         spawnEntity(grayCube, tower.x, tower.y, true);
                     }
-                }, i * 2000); // Every 2 seconds
+                }, i * BETA_PROTOCOL_STATS.GRAY_CUBE_INTERVAL);
                 betaProtocolTimeouts.push(timeoutId);
             }
-            
-            // 10x Black cubes
-            for (let i = 0; i < 10; i++) {
+
+            // Black cubes (10 total, every 3 seconds)
+            for (let i = 0; i < BETA_PROTOCOL_STATS.BLACK_CUBE_COUNT; i++) {
                 const timeoutId = setTimeout(() => {
                     if (waveActive) { // Only spawn if game is still active
                         const blackHp = SUMMON_TYPES.BETA_BLACK.hp + stats.baseHp;
                         const blackCube = { ...SUMMON_TYPES.BETA_BLACK, hp: blackHp };
                         spawnEntity(blackCube, tower.x, tower.y, true);
                     }
-                }, i * 3000); // Every 3 seconds
+                }, i * BETA_PROTOCOL_STATS.BLACK_CUBE_INTERVAL);
                 betaProtocolTimeouts.push(timeoutId);
             }
-            
-            // 5x Yellow cubes
-            for (let i = 0; i < 5; i++) {
+
+            // Yellow cubes (5 total, every 5 seconds)
+            for (let i = 0; i < BETA_PROTOCOL_STATS.YELLOW_CUBE_COUNT; i++) {
                 const timeoutId = setTimeout(() => {
                     if (waveActive) { // Only spawn if game is still active
                         const yellowHp = SUMMON_TYPES.BETA_YELLOW.hp + stats.baseHp;
                         const yellowCube = { ...SUMMON_TYPES.BETA_YELLOW, hp: yellowHp };
                         spawnEntity(yellowCube, tower.x, tower.y, true);
                     }
-                }, i * 5000); // Every 5 seconds
+                }, i * BETA_PROTOCOL_STATS.YELLOW_CUBE_INTERVAL);
                 betaProtocolTimeouts.push(timeoutId);
             }
 
@@ -2239,17 +1924,24 @@ function startNextWave() {
 // Skip wave
 function skipWave() {
     if (waveActive) {
-        enemiesToSpawn = [];  // Stop spawning new enemies
+        // Don't clear enemiesToSpawn - let current wave enemies finish spawning
         waveActive = false;
         waveTimer = 0;
         nextWaveBtn.textContent = "Start Wave";
         nextWaveBtn.disabled = false;  // Keep start button enabled
         skipWaveBtn.disabled = true;
-        
+
         // Apply cash multiplier from game mode
         const waveCashReward = Math.floor(60 * Math.pow(1.1, waveNumber - 1) * currentGameMode.cashMultiplier);
         cash += waveCashReward;
         updateCashDisplay();
+
+        // Auto-start next wave after 3 seconds (same as wave complete)
+        setTimeout(() => {
+            if (!waveActive) {
+                startNextWave();
+            }
+        }, 3000);
     }
 }
 
@@ -2278,15 +1970,45 @@ function generateFarmCash() {
 }
 
 // Spawn wave
-function spawnWave() {
-    enemiesToSpawn = [];
-    
+// Helper to process the current group of enemies for a specific wave
+function processWaveGroup(wave) {
+    if (!wave.data || wave.groupIndex >= wave.data.groups.length) return;
+
+    const group = wave.data.groups[wave.groupIndex];
+    wave.enemiesQueue = [];
+
     // Calculate HP multiplier - only for endless mode after wave 30
-    const hpMultiplier = (currentGameMode === GAME_MODES.ENDLESS && waveNumber > 30) ? 
-                         Math.pow(1.08, waveNumber - 30) : 1;
-    
-    // Old boss system removed - bosses are now defined in wave files
-    
+    const hpMultiplier = (currentGameMode === GAME_MODES.ENDLESS && waveNumber > 30) ?
+        Math.pow(1.08, waveNumber - 30) : 1;
+
+    for (const [type, count] of Object.entries(group.enemies)) {
+        if (ENEMY_TYPES[type]) {
+            for (let i = 0; i < count; i++) {
+                const baseHp = ENEMY_TYPES[type].isKing ?
+                    ENEMY_TYPES[type].baseHp :
+                    Math.floor(ENEMY_TYPES[type].baseHp * hpMultiplier);
+                let enemyType = { ...ENEMY_TYPES[type], baseHp: baseHp };
+
+                // Apply stat overrides if present in the group
+                if (group.statOverrides && group.statOverrides[type]) {
+                    const overrides = group.statOverrides[type];
+                    if (overrides.hp) enemyType.baseHp = overrides.hp;
+                    if (overrides.shield) {
+                        enemyType.hasShield = true;
+                        enemyType.shieldHp = overrides.shield;
+                    }
+                    if (overrides.speed) enemyType.speed = overrides.speed;
+                }
+
+                wave.enemiesQueue.push(enemyType);
+            }
+        }
+    }
+    shuffleArray(wave.enemiesQueue);
+}
+
+// Spawn wave
+function spawnWave() {
     // Get the correct wave array based on game mode
     let currentWaves;
     if (currentGameMode === GAME_MODES.NORMAL) {
@@ -2295,52 +2017,63 @@ function spawnWave() {
         currentWaves = HARDMODE_WAVES;
     } else if (currentGameMode === GAME_MODES.INSANE) {
         currentWaves = INSANE_WAVES;
+    } else if (currentGameMode === GAME_MODES.ENDLESS) {
+        currentWaves = EXTRA_WAVES;
     } else {
         currentWaves = NORMAL_WAVES; // Fallback
     }
-    
+
+    let waveData;
+
     // Generate regular wave enemies
     if (waveNumber <= currentWaves.length) {
-        const wave = currentWaves[waveNumber - 1];
-        for (const [type, count] of Object.entries(wave)) {
-            if (ENEMY_TYPES[type]) {
-                for (let i = 0; i < count; i++) {
-                    const baseHp = ENEMY_TYPES[type].isKing ? 
-                        ENEMY_TYPES[type].baseHp : 
-                        Math.floor(ENEMY_TYPES[type].baseHp * hpMultiplier);
-                    const enemyType = { ...ENEMY_TYPES[type], baseHp: baseHp };
-                    enemiesToSpawn.push(enemyType);
-                }
-            }
-        }
+        waveData = currentWaves[waveNumber - 1];
     } else {
         // For endless mode or waves beyond defined ones, generate procedural waves
-        const baseEnemies = currentGameMode === GAME_MODES.INSANE ? 
-            ['red_cube_insane', 'blue_cube_insane', 'gray_cube_insane', 'boss_cube_insane'] :
-            currentGameMode === GAME_MODES.HARDMODE ?
-            ['red_cube_hard', 'blue_cube_hard', 'gray_cube_hard', 'boss_cube_hard'] :
-            ['red_cube', 'blue_cube', 'gray_cube', 'boss_cube'];
-        
-        const waveConfig = {};
-        baseEnemies.forEach(enemy => {
-            waveConfig[enemy] = Math.floor(Math.random() * 15) + 5;
-        });
-        
-        for (const [type, count] of Object.entries(waveConfig)) {
-            if (ENEMY_TYPES[type]) {
-                for (let i = 0; i < count; i++) {
-                    const baseHp = Math.floor(ENEMY_TYPES[type].baseHp * hpMultiplier);
-                    const enemyType = { ...ENEMY_TYPES[type], baseHp: baseHp };
-                    enemiesToSpawn.push(enemyType);
-                }
-            }
+        if (currentGameMode === GAME_MODES.ENDLESS && typeof getProceduralEndlessWave === 'function') {
+            waveData = getProceduralEndlessWave(waveNumber);
+        } else {
+            const baseEnemies = currentGameMode === GAME_MODES.INSANE ?
+                ['red_cube_insane', 'blue_cube_insane', 'gray_cube_insane', 'boss_cube_insane'] :
+                currentGameMode === GAME_MODES.HARDMODE ?
+                    ['red_cube_hard', 'blue_cube_hard', 'gray_cube_hard', 'boss_cube_hard'] :
+                    ['red_cube', 'blue_cube', 'gray_cube', 'boss_cube'];
+
+            const waveConfig = {};
+            baseEnemies.forEach(enemy => {
+                waveConfig[enemy] = Math.floor(Math.random() * 15) + 5;
+            });
+
+            // Create a procedural wave object in the new format
+            waveData = {
+                groups: [{
+                    enemies: waveConfig,
+                    spawnInterval: SPAWN_DELAY,
+                    waitAfter: 0
+                }],
+                endWaitTime: 3000
+            };
         }
     }
-    
-    shuffleArray(enemiesToSpawn);
-    lastSpawnTime = performance.now();
-}
 
+    // Create new active wave object
+    const newWave = {
+        data: waveData,
+        groupIndex: 0,
+        waitTimer: 0,
+        isWaiting: false,
+        enemiesQueue: [],
+        lastSpawnTime: performance.now()
+    };
+
+    try {
+        processWaveGroup(newWave);
+        activeWaves.push(newWave);
+        console.log(`Wave ${waveNumber} spawned. Mode: ${currentGameMode.name}`);
+    } catch (error) {
+        console.error("Error spawning wave:", error);
+    }
+}
 // Shuffle array
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -2355,7 +2088,7 @@ function spawnEntity(entityType, x, y, isSummon = false) {
     let hp = entityType.hp || entityType.baseHp;
     let shield = entityType.hasShield ? (entityType.shieldHp || 0) : 0;
     let speed = entityType.speed;
-    
+
     // Apply special Straight Line map stats (if they exist)
     if (currentMap === MAP_TYPES.STRAIGHT && !isSummon) {
         if (entityType.insaneHp) {
@@ -2368,7 +2101,7 @@ function spawnEntity(entityType, x, y, isSummon = false) {
             speed = entityType.insaneSpeed;
         }
     }
-    
+
     const entity = {
         type: entityType,
         x: isSummon ? path[path.length - 1].x : path[0].x,
@@ -2435,7 +2168,7 @@ function gameLoop(timestamp) {
         updateProjectiles(timestamp);
         updateOrbitalStrike(timestamp);
         updateTowerInfoPeriodically(timestamp);
-        checkWaveComplete(); 
+        checkWaveComplete();
     }
     requestAnimationFrame(gameLoop);
 }
@@ -2463,13 +2196,13 @@ function drawSelectedTowerRange() {
     if (selectedTower && selectedCell) {
         const stats = selectedTower.levels[0];
         const rangeRadius = (stats.range || 0) * GRID_SIZE;
-        
+
         // Draw range circle
         ctx.beginPath();
         ctx.arc(selectedCell.x * GRID_SIZE + GRID_SIZE / 2, selectedCell.y * GRID_SIZE + GRID_SIZE / 2, rangeRadius, 0, 2 * Math.PI);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.fill();
-        
+
         // Draw tower placement preview square(s)
         ctx.fillStyle = selectedTower.color;
         ctx.globalAlpha = 0.6;
@@ -2530,21 +2263,21 @@ function drawPath() {
     for (let i = 0; i < path.length; i++) {
         const point = path[i];
         const progress = i / path.length;
-        
+
         // Create gradient from start (green) to end (red)
         const r = Math.floor(100 + progress * 100);
         const g = Math.floor(150 - progress * 100);
         const b = 50;
-        
+
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
         ctx.fillRect(point.x - GRID_SIZE / 2, point.y - GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
-        
+
         // Add border
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.lineWidth = 1;
         ctx.strokeRect(point.x - GRID_SIZE / 2, point.y - GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
     }
-    
+
     // Draw start marker
     if (path.length > 0) {
         ctx.fillStyle = '#4CAF50';
@@ -2553,7 +2286,7 @@ function drawPath() {
         ctx.textBaseline = 'middle';
         ctx.fillText('START', path[0].x, path[0].y);
     }
-    
+
     // Draw end marker
     if (path.length > 0) {
         ctx.fillStyle = '#f44336';
@@ -2579,22 +2312,22 @@ function updateTowers(timestamp) {
         if (!tower.type || !tower.type.levels || tower.level < 1 || tower.level > tower.type.levels.length) continue;
         const stats = tower.type.levels[tower.level - 1];
 
-         // --- Summoner Logic ---
+        // --- Summoner Logic ---
         if (tower.type.summons && stats.summons) {
             stats.summons.forEach(summon => {
                 const lastSummonTime = tower.lastSummonTimes[summon.type] || 0;
-                
+
                 // --- Cube Factory Specific Summon Logic ---
                 if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
-                    const activeFactoryCubes = enemies.filter(e => 
+                    const activeFactoryCubes = enemies.filter(e =>
                         e.type.name.includes('Factory Cube') && e.hp > 0
                     ).length;
 
                     // If active summons limit is reached, don't spawn
                     if (activeFactoryCubes >= tower.type.maxActiveSummons) {
-                        return; 
+                        return;
                     }
-                    
+
                     // Enforce global cooldown for Cube Factory
                     const timeSinceGlobalCooldown = performance.now() - lastGlobalFactorySpawnTime;
                     if (lastSummonTime !== 0 && timeSinceGlobalCooldown < tower.type.globalSpawnCooldown) {
@@ -2602,7 +2335,7 @@ function updateTowers(timestamp) {
                         tower.lastSummonTimes[summon.type] = performance.now() - (tower.type.globalSpawnCooldown - timeSinceGlobalCooldown);
                         return; // Don't spawn if global cooldown is active
                     }
-                    
+
                     // If general spawn conditions are met, spawn the entity
                     if (timestamp - lastSummonTime >= summon.spawnRate) {
                         console.log(`[DEBUG CF] Spawning ${summon.type} from ${tower.type.name} (regular interval spawn).`);
@@ -2628,14 +2361,14 @@ function updateTowers(timestamp) {
             // Get Commander buffs (unless tower cannot be buffed)
             const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
             const rangeBonus = tower.type.rangeBonus || 0;
-            
+
             // Get Sniper Paragon buffs
             const sniperParagonBoost = getSniperParagonBuffs(tower);
-            
+
             const buffedDamage = Math.floor(stats.damage * (1 + buffs.damageBoost) + sniperParagonBoost);
             const buffedDirectDamage = stats.directDamage ? Math.floor(stats.directDamage * (1 + buffs.damageBoost)) : 0;
             const buffedFireRate = stats.fireRate * (1 - buffs.fireRateBoost);
-            
+
             if (!tower.target || tower.target.hp <= 0 || !enemies.includes(tower.target) || !isInRange(tower, tower.target)) {
                 tower.target = findTarget(tower);
             }
@@ -2648,13 +2381,13 @@ function updateTowers(timestamp) {
                             applyDamage(enemy, damage, 'explosive');
                         }
                     });
-                    explosions.push({ 
-                        x: tower.target.x, 
-                        y: tower.target.y, 
-                        size: 0, 
-                        maxSize: tower.type.name === 'Rocketer' ? 4 * GRID_SIZE : 2 * GRID_SIZE, 
-                        startTime: timestamp, 
-                        duration: 500 
+                    explosions.push({
+                        x: tower.target.x,
+                        y: tower.target.y,
+                        size: 0,
+                        maxSize: tower.type.name === 'Rocketer' ? 4 * GRID_SIZE : 2 * GRID_SIZE,
+                        startTime: timestamp,
+                        duration: 500
                     });
                 } else if (tower.type.name === 'Raygunner') {
                     if (!tower.target.isSummon) {
@@ -2688,7 +2421,7 @@ function updateTowers(timestamp) {
                             duration: 500,
                             color: '#00FFFF'
                         });
-                        
+
                         // Radian 3: Add explosion after delay
                         if (tower.level === 3 && stats.explosionDamage) {
                             const targetX = tower.target.x;
@@ -2738,20 +2471,20 @@ function updateTowers(timestamp) {
 // Apply damage with resistance calculation
 function applyDamage(enemy, damage, damageType = 'normal') {
     let finalDamage = damage;
-    
+
     // Apply resistances if enemy has them
     if (enemy.resistance) {
         // Apply global resistance first
         if (enemy.resistance.global) {
             finalDamage *= (1 - enemy.resistance.global);
         }
-        
+
         // Apply specific damage type resistance
         if (damageType === 'explosive' && enemy.resistance.explosive) {
             finalDamage *= (1 - enemy.resistance.explosive);
         }
     }
-    
+
     // Apply damage to shield first, then HP
     let remainingDamage = Math.round(finalDamage);
     if (enemy.type.hasShield && enemy.shield > 0) {
@@ -2763,10 +2496,10 @@ function applyDamage(enemy, damage, damageType = 'normal') {
             enemy.shield = 0;
         }
     }
-    
+
     // Apply remaining damage to HP
     enemy.hp -= remainingDamage;
-    
+
     return finalDamage;
 }
 
@@ -2776,7 +2509,7 @@ function findTarget(tower) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    
+
     let furthestEnemy = null;
     let maxDistanceTraveled = -Infinity;
     for (const enemy of enemies) {
@@ -2836,21 +2569,62 @@ function drawTowers() {
 
 
 // Update wave
+// Update wave
+// Update wave
 function updateWave(timestamp) {
-    if (waveActive && enemiesToSpawn.length > 0 && timestamp - lastSpawnTime >= SPAWN_DELAY) {
-        const startPoint = path[0];
-        spawnEntity(enemiesToSpawn.shift(), startPoint.x, startPoint.y);
-        lastSpawnTime = timestamp;
+    // Iterate backwards to allow removal of finished waves
+    for (let i = activeWaves.length - 1; i >= 0; i--) {
+        const wave = activeWaves[i];
+
+        // Check if this wave is finished
+        if (wave.groupIndex >= wave.data.groups.length && wave.enemiesQueue.length === 0) {
+            activeWaves.splice(i, 1);
+            continue;
+        }
+
+        // Handle group waiting logic
+        if (wave.isWaiting) {
+            wave.waitTimer += 16; // Approx 1 frame
+            const currentGroup = wave.data.groups[wave.groupIndex];
+
+            if (wave.waitTimer >= currentGroup.waitAfter) {
+                wave.isWaiting = false;
+                wave.groupIndex++;
+
+                if (wave.groupIndex < wave.data.groups.length) {
+                    processWaveGroup(wave);
+                    wave.lastSpawnTime = timestamp;
+                }
+            }
+        } else {
+            // Spawn enemies
+            if (wave.enemiesQueue.length > 0) {
+                const currentGroup = wave.data.groups[wave.groupIndex];
+                if (timestamp - wave.lastSpawnTime >= currentGroup.spawnInterval) {
+                    const startPoint = path[0];
+                    spawnEntity(wave.enemiesQueue.shift(), startPoint.x, startPoint.y);
+                    wave.lastSpawnTime = timestamp;
+                }
+            } else {
+                // Group finished
+                if (wave.groupIndex < wave.data.groups.length) {
+                    wave.isWaiting = true;
+                    wave.waitTimer = 0;
+                }
+            }
+        }
     }
-    
+
     // Enable skip button after 10 seconds into wave
     if (waveActive && waveTimer >= 10000) {
         skipWaveBtn.disabled = false;
     } else {
         skipWaveBtn.disabled = true;
     }
-    
-    waveTimer += 16; // ~60fps
+
+    if (waveActive) {
+        waveTimer += 16; // ~60fps
+    }
 }
 
 
@@ -2899,7 +2673,7 @@ function updateEnemies(timestamp) {
 
             // Step 2: Move the entity based on its current speed (potentially 0 if it stopped for Test Unit)
             moveEntity(entity, true);
-            
+
             // Step 3: Handle kamikaze cubes (Beta Yellow) - Check for proximity AFTER movement
             if (entity.type.isKamikaze) {
                 const targetForKamikaze = findSummonTarget(entity); // Re-find target after movement
@@ -2918,7 +2692,7 @@ function updateEnemies(timestamp) {
                     explosions.push({ x: entity.x, y: entity.y, size: 0, maxSize: entity.type.deathRange * GRID_SIZE, startTime: timestamp, duration: 500 });
                 }
             }
-            
+
             // Step 4: Handle ram and removal if at start/end of path
             handleRam(entity, i);
             if (entity.distanceTraveled <= 0) enemies.splice(i, 1);
@@ -3010,7 +2784,7 @@ function handleSummonAttacks(entity, target, timestamp) {
     } else if (entity.type.name === 'Rainbow Cube') {
         handleRainbowCubeAttacks(entity, target, timestamp);
     }
-     else if (entity.type.name.includes('Factory Cube')) { // Handles L1, L2, L3
+    else if (entity.type.name.includes('Factory Cube')) { // Handles L1, L2, L3
         handleFactoryCubeAttacks(entity, target, timestamp);
     }
 }
@@ -3023,7 +2797,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
         projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'yellow', width: 1, startTime: timestamp, duration: 50 });
         entity.lastFired = timestamp;
     }
-    
+
     // Railgun burst
     if (timestamp - entity.lastRailgun >= entity.type.railgunCooldown) {
         entity.railgunCountRemaining = entity.railgunCountRemaining || entity.type.railgunCount;
@@ -3039,7 +2813,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
             entity.railgunCountRemaining = null;
         }
     }
-    
+
     // Missile burst
     if (timestamp - entity.lastMissile >= entity.type.missileCooldown) {
         entity.missileCountRemaining = entity.missileCountRemaining || entity.type.missileCount;
@@ -3060,7 +2834,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
             entity.missileCountRemaining = null;
         }
     }
-    
+
     // Laser burst
     if (timestamp - entity.lastLaser >= entity.type.laserCooldown) {
         entity.laserCountRemaining = entity.laserCountRemaining || entity.type.laserBurstCount;
@@ -3076,7 +2850,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
             entity.laserCountRemaining = null;
         }
     }
-    
+
     // Main railgun (super attack)
     if (entity.mainRailgunUses > 0 && timestamp - entity.lastMainRailgun >= entity.type.mainRailgunCooldown) {
         entity.mainRailgunCountRemaining = entity.mainRailgunCountRemaining || entity.type.mainRailgunCount;
@@ -3104,7 +2878,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
     entity.lastKnockback = entity.lastKnockback || 0;
 
     // ----- Movement Logic: Stop if any enemy in general range -----
-    const anyEnemyInRange = enemies.some(enemy => 
+    const anyEnemyInRange = enemies.some(enemy =>
         !enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.range * GRID_SIZE
     );
 
@@ -3138,7 +2912,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
             if (closestBoss) {
                 // Deal knockback damage to the *single* closest boss
                 applyDamage(closestBoss, entity.type.knockbackDirectDamage, 'explosive');
-                
+
                 // KNOCKBACK MOVEMENT: Reduce distanceTraveled for the single boss
                 const knockbackDistance = entity.type.knockbackPower * GRID_SIZE; // Use knockbackPower from entity type
                 closestBoss.distanceTraveled = Math.max(0, closestBoss.distanceTraveled - knockbackDistance);
@@ -3365,24 +3139,24 @@ function drawSpawnTimer() {
         selectedTowerForTimer = null;
         return;
     }
-    
+
     const tower = selectedTowerForTimer;
-    
+
     // Only show timer for summoner towers
     if (!tower.type.summons) return;
-    
+
     const stats = tower.type.levels[tower.level - 1];
     if (!stats.summons) return;
-    
+
     // Draw timer for each summon type
     stats.summons.forEach((summon, index) => {
         let timeUntilNextSpawn = 0;
-        
+
         // Special handling for Cube Factory with global cooldown
         if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
             const timeSinceGlobalCooldown = performance.now() - lastGlobalFactorySpawnTime;
             const globalCooldownRemaining = Math.max(0, tower.type.globalSpawnCooldown - timeSinceGlobalCooldown);
-            
+
             if (globalCooldownRemaining > 0) {
                 // Show global cooldown timer
                 timeUntilNextSpawn = globalCooldownRemaining;
@@ -3398,24 +3172,24 @@ function drawSpawnTimer() {
             const timeSinceLastSpawn = performance.now() - lastSummonTime;
             timeUntilNextSpawn = Math.max(0, summon.spawnRate - timeSinceLastSpawn);
         }
-        
+
         const secondsUntilSpawn = (timeUntilNextSpawn / 1000).toFixed(1);
-        
+
         // Draw timer box above tower
         const boxX = tower.x - 40;
         const boxY = tower.y - 80 - (index * 25);
-        
+
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(boxX - 5, boxY - 5, 90, 20);
-        
+
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.strokeRect(boxX - 5, boxY - 5, 90, 20);
-        
+
         ctx.fillStyle = '#FFD700';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'left';
-        
+
         // Show if it's global cooldown or individual timer
         const timerLabel = tower.type === TOWER_TYPES.CUBE_FACTORY ? 'Global:' : `${SUMMON_TYPES[summon.type].name}:`;
         ctx.fillText(timerLabel, boxX, boxY + 8);
@@ -3448,39 +3222,39 @@ function drawEntities() {
             const barHeight = 12; // Taller bar
             const healthRatio = entity.hp / entity.maxHp;
             const shieldRatio = entity.shield / entity.maxShield;
-            
+
             // Background with padding
             ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             ctx.fillRect(entity.x - barWidth / 2 - 5, entity.y - size / 2 - barHeight - 40, barWidth + 10, barHeight + 45);
-            
+
             // HP bar background
             ctx.fillStyle = '#3A0000';
             ctx.fillRect(entity.x - barWidth / 2, entity.y - size / 2 - barHeight - 8, barWidth, barHeight);
-            
+
             // HP bar
             ctx.fillStyle = '#FF0000';
             ctx.fillRect(entity.x - barWidth / 2, entity.y - size / 2 - barHeight - 8, barWidth * healthRatio, barHeight);
-            
+
             // Shield bar (if has shield)
             if (entity.type.hasShield && entity.shield > 0) {
                 ctx.fillStyle = 'rgba(0, 191, 255, 0.7)';
                 ctx.fillRect(entity.x - barWidth / 2, entity.y - size / 2 - barHeight - 8, barWidth * shieldRatio, barHeight);
             }
-            
+
             // Border
             ctx.strokeStyle = '#FFD700';
             ctx.lineWidth = 2;
             ctx.strokeRect(entity.x - barWidth / 2, entity.y - size / 2 - barHeight - 8, barWidth, barHeight);
-            
+
             // Name
             ctx.fillStyle = 'white';
             ctx.font = 'bold 12px Arial';
             ctx.textAlign = 'center';
             ctx.fillText(entity.type.name, entity.x, entity.y - size / 2 - barHeight - 24);
-            
+
             // HP text
             ctx.font = 'bold 11px Arial';
-            const hpText = entity.type.hasShield ? 
+            const hpText = entity.type.hasShield ?
                 `HP: ${Math.floor(entity.hp).toLocaleString()} | Shield: ${Math.floor(entity.shield).toLocaleString()}` :
                 `HP: ${Math.floor(entity.hp).toLocaleString()} / ${entity.maxHp.toLocaleString()}`;
             ctx.fillText(hpText, entity.x, entity.y - size / 2 - barHeight - 12);
@@ -3502,11 +3276,11 @@ function drawEntities() {
             // HP bar background
             ctx.fillStyle = '#3A0000';
             ctx.fillRect(mainBarX, mainBarY, mainBarWidth, mainBarHeight);
-            
+
             // HP bar
             ctx.fillStyle = '#FF0000';
             ctx.fillRect(mainBarX, mainBarY, mainBarWidth * mainHealthRatio, mainBarHeight);
-            
+
             // Shield bar (if has shield)
             if (entity.type.hasShield && entity.shield > 0) {
                 ctx.fillStyle = 'rgba(0, 191, 255, 0.7)';
@@ -3521,18 +3295,18 @@ function drawEntities() {
             // Text
             ctx.fillStyle = 'white';
             ctx.textAlign = 'center';
-            
+
             // Show name only when expanded
             if (!hpBarCollapsed) {
                 ctx.font = 'bold 20px Arial';
                 ctx.fillText(`${entity.type.name}`, gameWidth / 2, mainBarY - 20);
             }
-            
+
             ctx.font = hpBarCollapsed ? '12px Arial' : '16px Arial';
-            let hpText = entity.type.hasShield ? 
+            let hpText = entity.type.hasShield ?
                 `HP: ${Math.floor(entity.hp).toLocaleString()} / ${entity.maxHp.toLocaleString()} | Shield: ${Math.floor(entity.shield).toLocaleString()}` :
                 `HP: ${Math.floor(entity.hp).toLocaleString()} / ${entity.maxHp.toLocaleString()}`;
-            
+
             // Show DPS for test dummy
             if (entity.type.isTestDummy) {
                 const timeAlive = (performance.now() - entity.spawnTime) / 1000;
@@ -3540,28 +3314,28 @@ function drawEntities() {
                 const dps = timeAlive > 0 ? Math.floor(damageDealt / timeAlive) : 0;
                 hpText += ` | DPS: ${dps.toLocaleString()}`;
             }
-            
+
             ctx.fillText(hpText, gameWidth / 2, mainBarY + mainBarHeight / 2 + 5);
-            
+
             // Collapse/Expand toggle button
             const toggleSize = 30;
             const toggleX = gameWidth / 2 + mainBarWidth / 2 + 15;
             const toggleY = mainBarY - 5;
-            
+
             // Draw button background
             ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
             ctx.fillRect(toggleX, toggleY, toggleSize, toggleSize);
             ctx.strokeStyle = '#FFD700';
             ctx.lineWidth = 2;
             ctx.strokeRect(toggleX, toggleY, toggleSize, toggleSize);
-            
+
             // Draw arrow
             ctx.fillStyle = '#FFD700';
             ctx.font = 'bold 20px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(hpBarCollapsed ? '▼' : '▲', toggleX + toggleSize/2, toggleY + toggleSize/2);
-            
+            ctx.fillText(hpBarCollapsed ? '▼' : '▲', toggleX + toggleSize / 2, toggleY + toggleSize / 2);
+
             // Store toggle button rect for click detection
             hpBarToggleRect = { x: toggleX, y: toggleY, width: toggleSize, height: toggleSize };
         }
@@ -3623,7 +3397,7 @@ function gameOver() {
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
-    
+
     alert('Game Over! Your base was destroyed.');
     showMainMenu();
 }
@@ -3633,7 +3407,7 @@ function gameWon() {
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
-    
+
     alert(`Congratulations! You've completed the ${currentGameMode.name} mode!`);
     showMainMenu();
 }
@@ -3648,18 +3422,18 @@ function resetGame(newGame = false) {
             }
         }
     }
-    
+
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
-    
+
     // Reset all game state variables
     cash = 250 * (newGame ? currentGameMode.cashMultiplier : 1);
     waveNumber = 0;
     baseHp = BASE_HP;
     towers = [];
     enemies = [];
-    enemiesToSpawn = [];
+    activeWaves = []; // Clear active waves
     explosions = [];
     cashEffects = [];
     farmCount = 0;
@@ -3681,7 +3455,7 @@ function resetGame(newGame = false) {
     currentInfoTower = null;
     orbitalStrikeActive = false;
     orbitalStrikeData = null;
-    
+
     // Update UI
     updateCashDisplay();
     waveDisplay.textContent = waveNumber;
@@ -3689,15 +3463,15 @@ function resetGame(newGame = false) {
     nextWaveBtn.textContent = "Start Wave";
     nextWaveBtn.disabled = false;
     skipWaveBtn.disabled = true;
-    
+
     // Hide any tower info panel
     towerInfoPanel.style.display = 'none';
     currentInfoTower = null;
-    
+
     // Recreate the grid and path
     createGrid();
     createPath();
-    
+
     console.log(`Game reset successfully! Mode: ${currentGameMode.name}, Map: ${currentMap.name}`);
 }
 
@@ -3713,25 +3487,28 @@ function updateCashEffects(timestamp) {
 
 // Check wave complete
 function checkWaveComplete() {
-    if (waveActive && enemiesToSpawn.length === 0 && enemies.filter(e => !e.isSummon).length === 0) {
+    const allWavesDone = activeWaves.length === 0;
+    const noEnemiesLeft = enemies.filter(e => !e.isSummon).length === 0;
+
+    if (waveActive && allWavesDone && noEnemiesLeft) {
         waveActive = false;
         waveTimer = 0;
-        
+
         if (waveNumber >= currentGameMode.waves && currentGameMode.name !== 'Endless') {
             gameWon();
             return;
         }
-        
+
         nextWaveBtn.textContent = "Start Wave";
         nextWaveBtn.disabled = false;
         skipWaveBtn.disabled = true;
-        
+
         // Apply cash multiplier
         const waveCashReward = Math.floor(60 * Math.pow(1.1, waveNumber - 1) * currentGameMode.cashMultiplier);
         cash += waveCashReward;
         generateFarmCash();
         updateCashDisplay();
-        
+
         // Auto-start next wave after 3 seconds
         setTimeout(() => {
             if (!waveActive) {
@@ -3745,6 +3522,6 @@ function checkWaveComplete() {
 
 
 // Start the game when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initGame();
 });

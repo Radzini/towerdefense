@@ -17,7 +17,7 @@ const ENEMY_TYPES = {
     lava_cube: { name: 'Lava Cube', baseHp: 100, speed: 0.425, color: '#FF6347', size: 26 },
     guardian_cube: { name: 'Guardian Cube', baseHp: 5000, speed: 0.325, color: '#FFD700', size: 42, isBoss: true, isKing: true },
     crysalized_cube: { name: 'Crysalized Cube', baseHp: 40000, speed: 0.285, color: '#E0FFFF', size: 45, isBoss: true, isKing: true, showHpBar: true },
-    
+
     // ===== HARD MODE ENEMIES =====
     red_cube_hard: { name: 'Red Cube', baseHp: 6, speed: 0.45, color: '#FF0000', size: 20 },
     blue_cube_hard: { name: 'Blue Cube', baseHp: 4, speed: 0.65, color: '#0000FF', size: 18 },
@@ -34,7 +34,7 @@ const ENEMY_TYPES = {
     guardian_cube_2: { name: 'Guardian Cube-2', baseHp: 15000, speed: 0.5, color: '#FFD700', size: 44, isBoss: true },
     zeltron_cube: { name: 'Zeltron Cube', baseHp: 35000, speed: 0.45, color: '#00FF7F', size: 46, isBoss: true, showHpBar: true },
     crystalized_titan_cube: { name: 'Crystalized Titan Cube', baseHp: 250000, speed: 0.32, color: '#B0E0E6', size: 50, isBoss: true, isKing: true, showHpBar: true },
-    
+
     // ===== INSANE MODE ENEMIES =====
     red_cube_insane: { name: 'Red Cube', baseHp: 10, speed: 0.4, color: '#FF0000', size: 20 },
     blue_cube_insane: { name: 'Blue Cube', baseHp: 12, speed: 0.55, color: '#0000FF', size: 18 },
@@ -47,9 +47,9 @@ const ENEMY_TYPES = {
     frost_boss_cube: { name: 'Frost Boss Cube', baseHp: 5000, speed: 0.3, color: '#ADD8E6', size: 40, isBoss: true },
     gargantuar_z: { name: 'Gargantuar-Z', baseHp: 6500, shieldHp: 1500, speed: 0.5, color: '#8B0000', size: 45, hasShield: true, isBoss: true },
     lightning_boss_cube: { name: 'Lightning Boss Cube', baseHp: 850, speed: 0.75, color: '#FFD700', size: 34, isBoss: true },
-    king_slow_cube: { name: 'King Alpha Cube', baseHp: 54000, shieldHp: 6000, speed: 0.3, color: '#483D8B', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 20000, insaneShield: 7000, insaneSpeed: 0.3  },
-    king_fast_cube: { name: 'King Beta Cube', baseHp: 35000, shieldHp: 5000, speed: 0.3, color: '#FF1493', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 20000, insaneShield: 7000, insaneSpeed: 0.3  },
-    lord_cube: { name: 'Lord Cube', baseHp: 20000, shieldHp: 10000, speed: 0.2, color: '#be511fff', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 30000, insaneShield: 5000, insaneSpeed: 0.1  },
+    king_slow_cube: { name: 'King Alpha Cube', baseHp: 54000, shieldHp: 6000, speed: 0.3, color: '#483D8B', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 20000, insaneShield: 7000, insaneSpeed: 0.3 },
+    king_fast_cube: { name: 'King Beta Cube', baseHp: 35000, shieldHp: 5000, speed: 0.3, color: '#FF1493', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 20000, insaneShield: 7000, insaneSpeed: 0.3 },
+    lord_cube: { name: 'Lord Cube', baseHp: 20000, shieldHp: 10000, speed: 0.2, color: '#be511fff', size: 45, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 30000, insaneShield: 5000, insaneSpeed: 0.1 },
     icarus_cube: { name: 'Icarus Cube', baseHp: 1000, speed: 0.35, color: '#FFA500', size: 26 },
     hidden_icarus_cube: { name: 'Hidden Icarus Cube', baseHp: 120000, shieldHp: 30000, speed: 0.5, color: '#FF8C00', size: 50, hasShield: true, isBoss: true, isKing: true },
     titan_cube: { name: 'Titan Cube', baseHp: 150000, shieldHp: 50000, speed: 0.3, color: '#000000', size: 40, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 125000, insaneShield: 125000, insaneSpeed: 0.25 },
@@ -57,11 +57,11 @@ const ENEMY_TYPES = {
     corrupted_blue_cube: { name: 'Corrupted Blue Cube', baseHp: 4000, speed: 0.35, color: '#00008B', size: 25 },
     corrupted_gray_cube: { name: 'Corrupted Gray Cube', baseHp: 30000, speed: 0.25, color: '#2F4F4F', size: 32 },
     corrupted_titan_cube: { name: 'Corrupted Titan Cube', baseHp: 520000, shieldHp: 80000, speed: 0.25, color: '#191970', size: 55, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 600000, insaneShield: 400000, insaneSpeed: 0.1 },
-    ram_cube: { name: 'Ram Cube', baseHp: 20000, shieldHp: 80000, speed: 0.26 , color: '#CD5C5C', size: 42, hasShield: true, isBoss: true, insaneHp: 20000, insaneShield: 60000, insaneSpeed: 0.2  },
+    ram_cube: { name: 'Ram Cube', baseHp: 20000, shieldHp: 80000, speed: 0.26, color: '#CD5C5C', size: 42, hasShield: true, isBoss: true, insaneHp: 20000, insaneShield: 60000, insaneSpeed: 0.2 },
     celgar_cube: { name: 'Celgar Cube', baseHp: 60000, shieldHp: 20000, speed: 0.32, color: '#4682B4', size: 40, hasShield: true, isBoss: true, insaneHp: 40000, insaneShield: 20000, insaneSpeed: 0.3 },
     manager_cube: { name: 'Manager Cube', baseHp: 125000, speed: 0.5, color: '#9370DB', size: 46, isBoss: true, isKing: true },
     void_cube: { name: 'THE VOID CUBE', baseHp: 1600000, shieldHp: 400000, speed: 0.1, color: '#000000', size: 60, hasShield: true, isBoss: true, isKing: true, showHpBar: true, insaneHp: 5000000, insaneShield: 0, insaneSpeed: 0.065 },
-    
+
     // ===== BONUS ENEMIES (Cash rewards) =====
     green_square_500: { name: 'Green Square', baseHp: 100, speed: 0.8, color: '#00FF00', size: 25, cashReward: 500 },
     green_square_1000: { name: 'Green Square', baseHp: 100, speed: 0.8, color: '#00FF00', size: 25, cashReward: 1000 },
@@ -69,5 +69,9 @@ const ENEMY_TYPES = {
     green_square_5000: { name: 'Green Square', baseHp: 100, speed: 0.8, color: '#00FF00', size: 25, cashReward: 5000 },
 
     // ===== TEST DUMMY =====
-    test_dummy: { name: 'Test Dummy', baseHp: 10000000, speed: 0.1, color: '#FFD700', size: 50, isBoss: true, showHpBar: true, isTestDummy: true }
+    test_dummy: { name: 'Test Dummy', baseHp: 10000000, speed: 0.1, color: '#FFD700', size: 50, isBoss: true, showHpBar: true, isTestDummy: true },
+    // ===== ENDLESS MODE BOSSES =====
+    devastator: { name: 'Devastator', baseHp: 35000, speed: 0.3, color: '#800000', size: 40, isBoss: true },
+    gargantuar_king: { name: 'Gargantuar King', baseHp: 150000, shieldHp: 50000, speed: 0.2, color: '#800000', size: 35, hasShield: true, isBoss: true, isKing: true },
+    cube_destructor: { name: 'Cube Destructor', baseHp: 600000, speed: 0.25, color: '#800000', size: 45, isBoss: true, showHpBar: true }
 };

@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tower Defense Game</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <canvas id="gameCanvas"></canvas>
-    
+
     <!-- Game Mode Selection UI -->
     <div id="gameModeUI">
         <div class="mode-selection">
-            <button id="closeMenuBtn" class="close-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✕</button>
+            <button id="closeMenuBtn" class="close-btn"
+                style="position: absolute; top: 10px; right: 10px; display: none;">✕</button>
             <h1>🏰 Tower Defense</h1>
             <div class="selection-row">
                 <label for="modeSelect">Game Mode:</label>
@@ -46,7 +49,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Top HUD -->
     <div id="topHUD">
         <div class="hud-section">
@@ -87,7 +90,7 @@
             </button>
         </div>
     </div>
-    
+
     <!-- Tower Selection Panel -->
     <div id="towerPanel">
         <div class="panel-header">
@@ -164,7 +167,7 @@
             <!-- Gunner Paragon is an upgrade, not a placeable tower -->
         </div>
     </div>
-    
+
     <!-- Tower Info Panel (Persistent) -->
     <div id="towerInfoPanel">
         <div class="panel-header">
@@ -181,7 +184,7 @@
             <button id="ability2TowerBtn" class="upgrade-btn" style="display: none;">⚡ Ability 2</button>
         </div>
     </div>
-    
+
     <!-- Cheat Menu Modal -->
     <div id="cheatModal" class="modal hidden">
         <div class="modal-content cheat-content">
@@ -216,12 +219,20 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Load game configuration files first -->
     <script src="enemies.js"></script>
+    <!-- Load individual wave files -->
+    <script src="Normal.js"></script>
+    <script src="Hard.js"></script>
+    <script src="Insane.js"></script>
+    <script src="Extra.js"></script>
+    <!-- Load wave aggregator -->
     <script src="waves.js"></script>
-    
+    <script src="towers.js"></script>
+
     <!-- Load main game script -->
     <script src="script.js"></script>
 </body>
+
 </html>
