@@ -65,6 +65,8 @@ const moneyInput = document.getElementById('moneyInput');
 let freeUpgrades = false;
 let gameSpeed = 1;
 let invincible = false;
+let lastFrameTime = 0;
+let frameDelta = 16.667; // ms since last frame, init to 60fps
 
 // Game Constants
 const GRID_SIZE = 40;
@@ -146,13 +148,18 @@ const MAP_TYPES = {
     STANDARD: {
         name: "Standard",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
-                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -160,9 +167,14 @@ const MAP_TYPES = {
     STRAIGHT: {
         name: "Straight Line",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 2) },
-                { x: gridWidth - 1, y: Math.floor(gridHeight / 2) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(logicalH / 2) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -170,13 +182,18 @@ const MAP_TYPES = {
     INTERSECTION: {
         name: "Intersection",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
-                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -265,9 +282,9 @@ function initGame() {
 
 // Resize canvas
 function resizeCanvas() {
-    // Set fixed canvas size for consistency across all devices
-    canvas.width = 1400;
-    canvas.height = 900;
+    // Set canvas size to fit the screen window
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     // Don't change game dimensions if game is active
     if (waveNumber > 0 || towers.length > 0) {
@@ -503,8 +520,8 @@ function setupEventListeners() {
         freeUpgradesBtn.textContent = freeUpgrades ? '🆓 Free: ON' : '🆓 Free Upgrades';
     });
     speedUpBtn.addEventListener('click', () => {
-        gameSpeed = gameSpeed === 1 ? 2 : 1;
-        speedUpBtn.textContent = gameSpeed === 2 ? '⚡ Speed: x2' : '⚡ Speed x2';
+        gameSpeed = gameSpeed >= 4 ? 1 : gameSpeed + 1;
+        speedUpBtn.textContent = `⚡ Speed x${gameSpeed}`;
     });
 
     const spawnDummyBtn = document.getElementById('spawnDummyBtn');
@@ -2542,7 +2559,7 @@ function generateFarmCash() {
             const effect = { x: tower.x, y: tower.y - 10, text: `+$${cashAmount}`, alpha: 1, time: 0 };
             cashEffects.push(effect);
             const div = document.createElement('div');
-            div.className = 'cashEffect';
+            div.className = 'cash-effect';
             div.style.left = `${tower.x}px`;
             div.style.top = `${tower.y - 10}px`;
             div.textContent = effect.text;
@@ -2784,6 +2801,13 @@ function addDebugCash() {
 
 // Game loop
 function gameLoop(timestamp) {
+    // Compute frame delta for frame-rate independent movement
+    if (!lastFrameTime) lastFrameTime = timestamp;
+    frameDelta = timestamp - lastFrameTime;
+    if (frameDelta > 100) frameDelta = 100; // Cap to prevent huge jumps
+    if (frameDelta < 1) frameDelta = 1;
+    lastFrameTime = timestamp;
+
     // Apply game speed multiplier
     for (let i = 0; i < gameSpeed; i++) {
         ctx.clearRect(0, 0, gameWidth, gameHeight);
@@ -3000,10 +3024,10 @@ function updateTowers(timestamp) {
                     }
 
                     // Enforce global cooldown for Cube Factory
-                    const timeSinceGlobalCooldown = performance.now() - lastGlobalFactorySpawnTime;
+                    const timeSinceGlobalCooldown = timestamp - lastGlobalFactorySpawnTime;
                     if (lastSummonTime !== 0 && timeSinceGlobalCooldown < tower.type.globalSpawnCooldown) {
                         // If global cooldown is active, update individual tower timer to reflect it
-                        tower.lastSummonTimes[summon.type] = performance.now() - (tower.type.globalSpawnCooldown - timeSinceGlobalCooldown);
+                        tower.lastSummonTimes[summon.type] = timestamp - (tower.type.globalSpawnCooldown - timeSinceGlobalCooldown);
                         return; // Don't spawn if global cooldown is active
                     }
 
@@ -3257,9 +3281,17 @@ function applyDamage(enemy, damage, damageType = 'bullet') {
     // Apply remaining damage to HP
     enemy.hp -= remainingDamage;
 
-    // Award 5% of damage dealt as cash (only for non-summon enemies)
+    // Award tiered percentage of damage dealt as cash (only for non-summon enemies)
     if (!enemy.isSummon && finalDamage > 0) {
-        const cashOnHit = Math.floor(finalDamage * 0.05);
+        let cashPercentage = 0.10;
+        if (finalDamage > 50000) {
+            cashPercentage = 0.01;
+        } else if (finalDamage > 10000) {
+            cashPercentage = 0.03;
+        } else if (finalDamage > 2000) {
+            cashPercentage = 0.05;
+        }
+        const cashOnHit = Math.floor(finalDamage * cashPercentage);
         if (cashOnHit > 0) {
             cash += cashOnHit;
         }
@@ -3274,13 +3306,14 @@ function findTarget(tower) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
+    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
 
     let furthestEnemy = null;
     let maxDistanceTraveled = -Infinity;
     for (const enemy of enemies) {
         if (enemy.hp > 0 && !enemy.isSummon) {
-            const distance = calculateDistance(tower.x, tower.y, enemy.x, enemy.y);
-            if (distance <= buffedRange * GRID_SIZE && enemy.distanceTraveled > maxDistanceTraveled) {
+            const sqDist = calculateDistanceSq(tower.x, tower.y, enemy.x, enemy.y);
+            if (sqDist <= sqRange && enemy.distanceTraveled > maxDistanceTraveled) {
                 furthestEnemy = enemy;
                 maxDistanceTraveled = enemy.distanceTraveled;
             }
@@ -3295,12 +3328,23 @@ function isInRange(tower, target) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    return calculateDistance(tower.x, tower.y, target.x, target.y) <= buffedRange * GRID_SIZE;
+    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
+
+    return calculateDistanceSq(tower.x, tower.y, target.x, target.y) <= sqRange;
 }
 
 // Calculate distance
 function calculateDistance(x1, y1, x2, y2) {
-    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Calculate squared distance (fast)
+function calculateDistanceSq(x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return dx * dx + dy * dy;
 }
 
 // Convert hex color to rgba with alpha
@@ -3366,7 +3410,7 @@ function updateWave(timestamp) {
 
         // Handle group waiting logic
         if (wave.isWaiting) {
-            wave.waitTimer += 16; // Approx 1 frame
+            wave.waitTimer += frameDelta; // Frame-rate independent
             const currentGroup = wave.data.groups[wave.groupIndex];
 
             if (wave.waitTimer >= currentGroup.waitAfter) {
@@ -3407,7 +3451,7 @@ function updateWave(timestamp) {
     }
 
     if (waveActive) {
-        waveTimer += 16; // ~60fps
+        waveTimer += frameDelta; // Frame-rate independent
     }
 }
 
@@ -3931,7 +3975,7 @@ function getPathLength() {
 function moveEntity(entity, isSummon) {
     const pathLength = getPathLength();
     const direction = isSummon ? -1 : 1;
-    entity.distanceTraveled += entity.speed * direction;
+    entity.distanceTraveled += entity.speed * direction * (frameDelta / 16.667);
     entity.distanceTraveled = Math.max(0, Math.min(entity.distanceTraveled, pathLength));
 
     let distanceAlongPath = isSummon ? pathLength - entity.distanceTraveled : entity.distanceTraveled;

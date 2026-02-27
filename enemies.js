@@ -85,15 +85,15 @@ const ENEMY_TYPES = {
     titan_cube_br: { name: 'Titan Cube', baseHp: 1000000, speed: 0.35, color: '#000000', size: 55, isBoss: true, showHpBar: true },
     true_rammer: { name: 'True Rammer', baseHp: 350000, shieldHp: 150000, speed: 0.22, color: '#CD5C5C', size: 48, hasShield: true, isBoss: false, showHpBar: false },
     corrupted_titan: { name: 'Corrupted Titan', baseHp: 1500000, shieldHp: 500000, speed: 0.12, color: '#191970', size: 55, hasShield: true, isBoss: false, showHpBar: false },
-    true_void: { name: 'True Void', baseHp: 3000000, shieldHp: 2000000, speed: 0.15, color: '#000000', size: 65, hasShield: true, isBoss: false, showHpBar: true, resistances: { global: 0.10, bullet: 0.10, laser: 0.10, piercing: 0.10, explosive: 0.10 }  },
+    true_void: { name: 'True Void', baseHp: 3000000, shieldHp: 2000000, speed: 0.15, color: '#000000', size: 65, hasShield: true, isBoss: false, showHpBar: true, resistances: { global: 0.10, bullet: 0.10, laser: 0.10, piercing: 0.10, explosive: 0.10 } },
 
     // ===== NIGHTMARE MODE ENEMIES =====
-    yellow_cube_nm: { name: 'Yellow Cube', baseHp: 50, speed: 0.4, color: '#d8f500ff', size: 22, resistances: { explosive: 0.5} },
-    purple_cube_nm: { name: 'Purple Cube', baseHp: 75, speed: 0.4, color: '#9618e4ff', size: 20, resistances: { explosive: 0.5} },
-    green_cube_nm: { name: 'Green Cube', baseHp: 200, speed: 0.3, color: '#22b32fff', size: 22, resistances: { explosive: 0.5} }, 
-    golden_cube_nm: { name: 'Golden Cube', baseHp: 3000, speed: 0.275, color: '#FFD700', size: 30, resistances: { explosive: 0.5} },
+    yellow_cube_nm: { name: 'Yellow Cube', baseHp: 50, speed: 0.4, color: '#d8f500ff', size: 22, resistances: { explosive: 0.65 } },
+    purple_cube_nm: { name: 'Purple Cube', baseHp: 75, speed: 0.4, color: '#9618e4ff', size: 20, resistances: { explosive: 0.65 } },
+    green_cube_nm: { name: 'Green Cube', baseHp: 200, speed: 0.3, color: '#22b32fff', size: 22, resistances: { explosive: 0.5 } },
+    golden_cube_nm: { name: 'Golden Cube', baseHp: 3000, speed: 0.275, color: '#FFD700', size: 30, resistances: { explosive: 0.7 } },
     // before w20
-    berserker_cube_nm: { name: 'Berserker Cube', baseHp: 20000, shieldHp: 5000, speed: 0.25, color: '#FFD700', size: 35, hasShield: true, isBoss: true, showHpBar: true, resistances: { global: 0, bullet: 0.10, laser: 0.10, piercing: -0.10, explosive: 0.60 }  },
+    berserker_cube_nm: { name: 'Berserker Cube', baseHp: 20000, shieldHp: 5000, speed: 0.25, color: '#FFD700', size: 35, hasShield: true, isBoss: true, showHpBar: true, resistances: { global: 0, bullet: 0.10, laser: 0.10, piercing: -0.10, explosive: 0.60 } },
     // after w20
     frozen_cube_nm: { name: 'Frozen Cube', baseHp: 500, speed: 0.35, color: '#87CEEB', size: 25, resistances: { global: 0, bullet: 0.20, laser: 0.20, piercing: -0.35, explosive: 1 } },
     lava_cube_nm: { name: 'Lava Cube', baseHp: 500, speed: 0.35, color: '#FF6347', size: 25, resistances: { global: 0, bullet: 0, laser: 0, piercing: 0, explosive: 1 } },

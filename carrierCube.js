@@ -244,8 +244,8 @@ function updateCarrierUnits() {
 
                 if (dist > unit.type.range * GRID_SIZE) {
                     const angle = Math.atan2(dy, dx);
-                    unit.x += Math.cos(angle) * unit.type.speed * (1000 / 60);
-                    unit.y += Math.sin(angle) * unit.type.speed * (1000 / 60);
+                    unit.x += Math.cos(angle) * unit.type.speed * frameDelta;
+                    unit.y += Math.sin(angle) * unit.type.speed * frameDelta;
                 }
 
                 if (currentTime - unit.lastFireTime >= unit.type.fireRate) {
