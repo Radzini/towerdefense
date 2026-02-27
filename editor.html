@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MommyTDmeow Stats Editor</title>
+    <style>
+        :root {
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-tertiary: #2d2d2d;
+            --accent-color: #bb86fc;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --border-color: #333;
+            --success-color: #03dac6;
+            --danger-color: #cf6679;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+        }
+
+        .tab-buttons {
+            display: flex;
+            padding: 10px;
+            gap: 5px;
+            background-color: var(--bg-tertiary);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px 4px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-color);
+            color: #000;
+            font-weight: bold;
+        }
+
+        .list-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .list-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .list-item.active {
+            background-color: rgba(187, 134, 252, 0.15);
+            border-left: 3px solid var(--accent-color);
+        }
+
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            padding: 15px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: #000;
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: #000;
+        }
+
+        .btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .editor-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            background-color: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .level-card {
+            background-color: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-color);
+            margin-bottom: 15px;
+        }
+
+        .level-header {
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: var(--accent-color);
+        }
+
+        #status-msg {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background-color: var(--success-color);
+            color: black;
+            border-radius: 6px;
+            transform: translateY(150%);
+            transition: transform 0.3s;
+            font-weight: bold;
+        }
+
+        #status-msg.show {
+            transform: translateY(0);
+        }
+
+        .setup-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            gap: 20px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .setup-screen h1 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+
+        .setup-screen p {
+            color: var(--text-secondary);
+            max-width: 500px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="setup-screen">
+        <h1>📊 Stats Editor</h1>
+        <p>Click below to load your game files. You'll need to select <strong>towers.js</strong> and
+            <strong>enemies.js</strong> from your game folder.</p>
+        <button class="btn btn-primary" onclick="loadFiles()" style="font-size:1.1rem; padding: 15px 30px;">
+            📂 Load Game Files
+        </button>
+        <p style="font-size: 0.8rem; margin-top: 30px;">Tip: Open this file in Chrome for best results</p>
+    </div>
+
+    <!-- Main Editor -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>Stats Editor</h2>
+        </div>
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('towers')">Towers</button>
+            <button class="tab-btn" onclick="switchTab('summons')">Summons</button>
+            <button class="tab-btn" onclick="switchTab('enemies')">Enemies</button>
+        </div>
+        <div id="list-container" class="list-container"></div>
+    </div>
+
+    <div class="main-content">
+        <div class="toolbar">
+            <h3 id="current-item-name" style="margin:0; color:var(--text-secondary)">Select an item</h3>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-danger" onclick="restoreDefaults()">Restore Defaults</button>
+                <button class="btn btn-success" onclick="saveFiles()">💾 Save Files</button>
+            </div>
+        </div>
+        <div id="editor-container" class="editor-container"></div>
+    </div>
+
+    <div id="status-msg">Saved!</div>
+
+    <script>
+        // State
+        let currentTab = 'towers';
+        let selectedId = null;
+        let TOWER_TYPES = {};
+        let SUMMON_TYPES = {};
+        let ENEMY_TYPES = {};
+
+        // Original data for restore
+        let ORIGINAL_TOWERS = {};
+        let ORIGINAL_SUMMONS = {};
+        let ORIGINAL_ENEMIES = {};
+
+        // File handles for saving back
+        let towersHandle = null;
+        let enemiesHandle = null;
+
+        // Parse JS file content to extract object
+        function parseJSFile(content, varName) {
+            try {
+                const func = new Function('window', content + `\n; return ${varName};`);
+                return func({}) || {};
+            } catch (e) {
+                console.error('Parse error for', varName, e);
+                return {};
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                // Check if File System Access API is available
+                if (!window.showOpenFilePicker) {
+                    alert('Your browser does not support file picking. Please use Chrome or Edge.');
+                    return;
+                }
+
+                alert('First, select your towers.js file');
+                [towersHandle] = await window.showOpenFilePicker({
+                    types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }]
+                });
+
+                alert('Now, select your enemies.js file');
+                [enemiesHandle] = await window.showOpenFilePicker({
+                    types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }]
+                });
+
+                // Read files
+                const towersFile = await towersHandle.getFile();
+                const enemiesFile = await enemiesHandle.getFile();
+
+                const towersContent = await towersFile.text();
+                const enemiesContent = await enemiesFile.text();
+
+                // Parse
+                TOWER_TYPES = parseJSFile(towersContent, 'TOWER_TYPES');
+                SUMMON_TYPES = parseJSFile(towersContent, 'SUMMON_TYPES');
+                ENEMY_TYPES = parseJSFile(enemiesContent, 'ENEMY_TYPES');
+
+                // Store originals for restore
+                ORIGINAL_TOWERS = JSON.parse(JSON.stringify(TOWER_TYPES));
+                ORIGINAL_SUMMONS = JSON.parse(JSON.stringify(SUMMON_TYPES));
+                ORIGINAL_ENEMIES = JSON.parse(JSON.stringify(ENEMY_TYPES));
+
+                // Hide setup, show editor
+                document.getElementById('setup-screen').style.display = 'none';
+                refreshList();
+                showStatus('Files loaded!');
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    alert('Error loading files: ' + e.message);
+                }
+            }
+        }
+
+        async function saveFiles() {
+            try {
+                if (!towersHandle || !enemiesHandle) {
+                    alert('No files loaded. Please load files first.');
+                    return;
+                }
+
+                // Build output
+                const towersOutput = `// Tower Types Configuration\n// Edited with Stats Editor\n\nconst TOWER_TYPES = ${JSON.stringify(TOWER_TYPES, null, 4)};\n\nconst SUMMON_TYPES = ${JSON.stringify(SUMMON_TYPES, null, 4)};\n\nwindow.SUMMON_TYPES = SUMMON_TYPES;\n`;
+                const enemiesOutput = `// Enemy Types Configuration\n// Edited with Stats Editor\n\nconst ENEMY_TYPES = ${JSON.stringify(ENEMY_TYPES, null, 4)};\n\nwindow.ENEMY_TYPES = ENEMY_TYPES;\n`;
+
+                // Write towers.js
+                const towersWritable = await towersHandle.createWritable();
+                await towersWritable.write(towersOutput);
+                await towersWritable.close();
+
+                // Write enemies.js
+                const enemiesWritable = await enemiesHandle.createWritable();
+                await enemiesWritable.write(enemiesOutput);
+                await enemiesWritable.close();
+
+                showStatus('Files saved!');
+            } catch (e) {
+                alert('Error saving: ' + e.message);
+            }
+        }
+
+        function restoreDefaults() {
+            if (confirm('Restore all values to what they were when you first loaded the files?')) {
+                TOWER_TYPES = JSON.parse(JSON.stringify(ORIGINAL_TOWERS));
+                SUMMON_TYPES = JSON.parse(JSON.stringify(ORIGINAL_SUMMONS));
+                ENEMY_TYPES = JSON.parse(JSON.stringify(ORIGINAL_ENEMIES));
+                refreshList();
+                document.getElementById('editor-container').innerHTML = '';
+                document.getElementById('current-item-name').innerText = 'Select an item';
+                showStatus('Defaults restored!');
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`button[onclick="switchTab('${tab}')"]`).classList.add('active');
+            selectedId = null;
+            document.getElementById('editor-container').innerHTML = '';
+            document.getElementById('current-item-name').innerText = 'Select an item';
+            refreshList();
+        }
+
+        function refreshList() {
+            const list = document.getElementById('list-container');
+            list.innerHTML = '';
+
+            let data = currentTab === 'towers' ? TOWER_TYPES :
+                currentTab === 'summons' ? SUMMON_TYPES : ENEMY_TYPES;
+
+            const keys = Object.keys(data).sort();
+            if (keys.length === 0) {
+                list.innerHTML = '<div style="padding:20px; color:gray; text-align:center">No items</div>';
+                return;
+            }
+
+            keys.forEach(key => {
+                const item = data[key];
+                const div = document.createElement('div');
+                div.className = 'list-item' + (selectedId === key ? ' active' : '');
+                div.onclick = () => selectItem(key);
+                div.innerHTML = `
+                    <span class="color-dot" style="background-color: ${item.color || '#888'}"></span>
+                    <span>${item.name || key}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function selectItem(key) {
+            selectedId = key;
+            refreshList();
+
+            const data = currentTab === 'towers' ? TOWER_TYPES :
+                currentTab === 'summons' ? SUMMON_TYPES : ENEMY_TYPES;
+            const item = data[key];
+
+            document.getElementById('current-item-name').innerText = `Editing: ${item.name || key}`;
+            renderEditor(item);
+        }
+
+        function renderEditor(item) {
+            const container = document.getElementById('editor-container');
+            container.innerHTML = '';
+
+            const priorityKeys = ['name', 'cost', 'baseHp', 'hp', 'speed', 'color', 'size', 'damage', 'range', 'fireRate'];
+            const keys = Object.keys(item).sort((a, b) => {
+                const ai = priorityKeys.indexOf(a);
+                const bi = priorityKeys.indexOf(b);
+                if (ai !== -1 && bi !== -1) return ai - bi;
+                if (ai !== -1) return -1;
+                if (bi !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            const grid = document.createElement('div');
+            grid.className = 'grid-2';
+
+            keys.forEach(key => {
+                if (key === 'levels') return;
+                const val = item[key];
+                const wrapper = document.createElement('div');
+                wrapper.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.innerText = key;
+
+                let input;
+                if (typeof val === 'boolean') {
+                    input = document.createElement('select');
+                    input.innerHTML = `<option value="true" ${val ? 'selected' : ''}>True</option><option value="false" ${!val ? 'selected' : ''}>False</option>`;
+                    input.onchange = () => { item[key] = input.value === 'true'; };
+                } else if (typeof val === 'number') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.step = 'any';
+                    input.value = val;
+                    input.onchange = () => { item[key] = parseFloat(input.value) || 0; };
+                } else if (typeof val === 'object' && val !== null) {
+                    input = document.createElement('textarea');
+                    input.value = JSON.stringify(val, null, 2);
+                    input.rows = 4;
+                    input.onchange = () => {
+                        try { item[key] = JSON.parse(input.value); input.style.borderColor = ''; }
+                        catch { input.style.borderColor = 'red'; }
+                    };
+                    label.innerText = key + ' (JSON)';
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = val || '';
+                    input.onchange = () => { item[key] = input.value; };
+                }
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(input);
+                grid.appendChild(wrapper);
+            });
+
+            container.appendChild(grid);
+
+            // Levels
+            if (item.levels && Array.isArray(item.levels)) {
+                const h3 = document.createElement('h3');
+                h3.innerText = 'Upgrade Levels';
+                h3.style.color = 'var(--text-secondary)';
+                h3.style.marginTop = '20px';
+                container.appendChild(h3);
+
+                item.levels.forEach((lvl, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'level-card';
+                    card.innerHTML = `<div class="level-header">Level ${idx + 1}</div>`;
+
+                    const lvlGrid = document.createElement('div');
+                    lvlGrid.className = 'grid-2';
+
+                    Object.keys(lvl).forEach(prop => {
+                        const w = document.createElement('div');
+                        const l = document.createElement('label');
+                        l.innerText = prop;
+                        l.style.color = 'var(--text-secondary)';
+                        l.style.fontSize = '0.8rem';
+                        l.style.display = 'block';
+                        l.style.marginBottom = '4px';
+
+                        const inp = document.createElement('input');
+                        inp.type = typeof lvl[prop] === 'number' ? 'number' : 'text';
+                        if (inp.type === 'number') inp.step = 'any';
+                        inp.value = lvl[prop];
+                        inp.style.padding = '8px';
+                        inp.onchange = () => {
+                            lvl[prop] = inp.type === 'number' ? parseFloat(inp.value) || 0 : inp.value;
+                        };
+
+                        w.appendChild(l);
+                        w.appendChild(inp);
+                        lvlGrid.appendChild(w);
+                    });
+
+                    card.appendChild(lvlGrid);
+                    container.appendChild(card);
+                });
+            }
+        }
+
+        function showStatus(msg) {
+            const el = document.getElementById('status-msg');
+            el.innerText = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 2500);
+        }
+    </script>
+</body>
+
+</html>

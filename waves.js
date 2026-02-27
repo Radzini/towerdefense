@@ -40,12 +40,21 @@ if (typeof EXTRA_WAVES === 'undefined') {
     }
 }
 
-// Ensure EXTRA_WAVES is defined
-if (typeof EXTRA_WAVES === 'undefined') {
-    if (typeof generateExtraWaves === 'function') {
-        window.EXTRA_WAVES = generateExtraWaves();
+// Ensure BOSSRUSH_WAVES is defined
+if (typeof BOSSRUSH_WAVES === 'undefined') {
+    if (typeof generateBossRushWaves === 'function') {
+        window.BOSSRUSH_WAVES = generateBossRushWaves();
     } else {
-        window.EXTRA_WAVES = [];
+        window.BOSSRUSH_WAVES = [];
+    }
+}
+
+// Ensure NIGHTMARE_WAVES is defined
+if (typeof NIGHTMARE_WAVES === 'undefined') {
+    if (typeof generateNightmareWaves === 'function') {
+        window.NIGHTMARE_WAVES = generateNightmareWaves();
+    } else {
+        window.NIGHTMARE_WAVES = [];
     }
 }
 
@@ -53,5 +62,7 @@ console.log("Wave definitions loaded:", {
     Normal: NORMAL_WAVES.length,
     Hard: HARDMODE_WAVES.length,
     Insane: INSANE_WAVES.length,
+    BossRush: BOSSRUSH_WAVES.length,
+    Nightmare: NIGHTMARE_WAVES.length,
     Extra: EXTRA_WAVES.length
 });

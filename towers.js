@@ -83,9 +83,9 @@ const TOWER_TYPES = {
         farm: true,
         levels: [
             { cashPerWave: 100, upgradeCost: 0 },
-            { cashPerWave: 350, upgradeCost: 250 },
-            { cashPerWave: 1000, upgradeCost: 600 },
-            { cashPerWave: 2500, upgradeCost: 1500 }
+            { cashPerWave: 200, upgradeCost: 250 },
+            { cashPerWave: 500, upgradeCost: 600 },
+            { cashPerWave: 1500, upgradeCost: 1500 }
         ]
     },
 
@@ -154,6 +154,25 @@ const TOWER_TYPES = {
             { damage: 35, fireRate: 500, range: 4, upgradeCost: 3000 },
             { damage: 30, fireRate: 100, range: 5, upgradeCost: 12000 },
             { damage: 75, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true }
+        ]
+    },
+
+
+    CHARGER: {
+        name: 'Charger',
+        color: 'cyan',
+        cost: 3250,
+        aoe: false,
+        summons: false,
+        limit: 8,
+        isCharger: true,
+        targetCooldown: 3000,
+        levels: [
+            { damageMin: 10, damageMax: 20, fireRate: 250, range: 6, upgradeCost: 0 },
+            { damageMin: 25, damageMax: 35, fireRate: 200, range: 7, upgradeCost: 2000 },
+            { damageMin: 40, damageMax: 80, fireRate: 150, range: 8, upgradeCost: 5000 },
+            { damageMin: 50, damageMax: 100, chargeMaxMin: 200, chargeMaxMax: 250, chargeRate: 2, chargeInterval: 100, fireRate: 100, range: 8, upgradeCost: 12000, cannotBeBuffed: true },
+            { damageMin: 80, damageMax: 120, chargeMaxMin: 250, chargeMaxMax: 500, chargeRate: 5, chargeInterval: 100, fireRate: 100, range: 10, upgradeCost: 30000, cannotBeBuffed: true }
         ]
     },
 
@@ -641,6 +660,201 @@ const SUMMON_TYPES = {
         railgunCooldown: 6000,
         railgunRange: Infinity,
         knockbackCooldown: 6000,
+        name: 'Orange Square L4',
+        color: 'orange',
+        hp: 1000,
+        speed: 0.5,
+        size: 25,
+        isSummon: true,
+        damage: 300,
+        directDamage: 750,
+        fireRate: 1500,
+        range: 8,
+        aoe: true
+    },
+    DARK_BLUE_SQUARE: {
+        name: 'Dark Blue Square',
+        color: 'darkblue',
+        hp: 5000,
+        speed: 0.3,
+        size: 30,
+        isSummon: true,
+        selfDestructDamage: 2000
+    },
+    GREEN_SQUARE: {
+        name: 'Green Square',
+        color: 'green',
+        hp: 2500,
+        speed: 0.4,
+        size: 27,
+        isSummon: true,
+        damage: 2000,
+        fireRate: 1000,
+        range: 14
+    },
+    PINK_SQUARE_L5: {
+        name: 'Pink Square L5',
+        color: 'darkpink',
+        hp: 2000,
+        speed: 0.5,
+        size: 27,
+        isSummon: true,
+        burstDamage: 125,
+        burstCount: 20,
+        burstFireRate: 50,
+        burstCooldown: 1500,
+        range: 12
+    },
+    DARK_BLUE_SQUARE_L5: {
+        name: 'Dark Blue Square L5',
+        color: 'darkblue',
+        hp: 10000,
+        speed: 0.3,
+        size: 35,
+        isSummon: true,
+        selfDestructDamage: 5000
+    },
+
+    // Rainbow Cube (Elite Spawner ability)
+    RAINBOW_CUBE: {
+        name: 'Rainbow Cube',
+        color: 'rainbow',
+        hp: 100000,
+        speed: 0.25,
+        size: 50,
+        isSummon: true,
+        railgunDamage: 5000,
+        railgunFireRate: 500,
+        railgunCount: 2,
+        railgunCooldown: 3000,
+        missileDamage: 1500,
+        missileDirectDamage: 2500,
+        missileFireRate: 400,
+        missileCount: 3,
+        missileCooldown: 4000,
+        laserDamage: 250,
+        laserBurstCount: 25,
+        laserFireRate: 40,
+        laserCooldown: 2500,
+        minigunDamage: 150,
+        minigunFireRate: 50,
+        mainRailgunDamage: 50000,
+        mainRailgunCount: 4,
+        mainRailgunFireRate: 250,
+        mainRailgunCooldown: 15000,
+        mainRailgunUses: 2,
+        range: 22
+    },
+
+    // Paragon Beta summons (alternative)
+    PARAGON_GRAY: {
+        name: 'Gray Cube',
+        color: '#808080',
+        hp: 2000,
+        speed: 0.4,
+        size: 20,
+        isSummon: true,
+        damage: 444,
+        fireRate: 500,
+        range: 7
+    },
+    PARAGON_BLACK: {
+        name: 'Black Cube',
+        color: '#000000',
+        hp: 5000,
+        speed: 0.4,
+        size: 22,
+        isSummon: true,
+        damage: 600,
+        fireRate: 1000,
+        range: 8
+    },
+    PARAGON_PURPLE: {
+        name: 'Purple Cube',
+        color: '#800080',
+        hp: 25000,
+        speed: 0.4,
+        size: 25,
+        isSummon: true,
+        damage: 50,
+        fireRate: 500,
+        range: 5
+    },
+    PARAGON_GRAY_SHIELD: {
+        name: 'Gray Cube Shield',
+        color: '#A9A9A9',
+        hp: 600,
+        shieldHp: 400,
+        speed: 0.4,
+        size: 20,
+        isSummon: true,
+        hasShield: true
+    },
+
+    // Cube Factory summons
+    FACTORY_CUBE_L1: {
+        name: 'Factory Cube L1',
+        color: '#8B0000',
+        hp: 15000,
+        speed: 0.25,
+        size: 35,
+        isSummon: true,
+        range: 12,
+        minigunDamage: 200,
+        minigunFireRate: 100,
+        rocketDamage: 400,
+        rocketDirectDamage: 600,
+        rocketFireRate: 250,
+        rocketCount: 4,
+        rocketCooldown: 3500,
+        rocketAOERange: 2
+    },
+    FACTORY_CUBE_L2: {
+        name: 'Factory Cube L2',
+        color: '#CD5C5C',
+        hp: 54000,
+        speed: 0.175,
+        size: 40,
+        isSummon: true,
+        range: 12,
+        minigunDamage: 250,
+        minigunFireRate: 80,
+        rocketDamage: 600,
+        rocketDirectDamage: 1000,
+        rocketFireRate: 200,
+        rocketCount: 4,
+        rocketCooldown: 4000,
+        rocketAOERange: 3,
+        railgunDamage: 10000,
+        railgunCooldown: 7000,
+        railgunRange: 100,
+        knockbackCooldown: 5000,
+        knockbackExplosionRange: 3,
+        knockbackExplosionDamage: 2000,
+        knockbackDirectDamage: 5000,
+        knockbackPower: 3,
+        isBossKnockbacker: true
+    },
+    FACTORY_CUBE_L3: {
+        name: 'Factory Cube L3',
+        color: '#FFD700',
+        hp: 250000,
+        speed: 0.12,
+        size: 54,
+        isSummon: true,
+        range: 14,
+        minigunDamage: 500,
+        minigunFireRate: 80,
+        rocketDamage: 2500,
+        rocketDirectDamage: 3500,
+        rocketFireRate: 200,
+        rocketCount: 6,
+        rocketCooldown: 5000,
+        rocketAOERange: 5,
+        railgunDamage: 25000,
+        railgunCooldown: 6000,
+        railgunRange: Infinity,
+        knockbackCooldown: 6000,
         knockbackExplosionRange: 3,
         knockbackExplosionDamage: 5000,
         knockbackDirectDamage: 10000,
@@ -648,3 +862,6 @@ const SUMMON_TYPES = {
         isBossKnockbacker: true
     }
 };
+
+// Expose to window for command terminal
+window.SUMMON_TYPES = SUMMON_TYPES;

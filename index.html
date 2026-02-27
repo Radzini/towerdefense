@@ -23,6 +23,8 @@
                     <option value="NORMAL">Normal (40 waves)</option>
                     <option value="HARDMODE">Hardmode (40 waves)</option>
                     <option value="INSANE">Insane (50 waves)</option>
+                    <option value="NIGHTMARE">Nightmare (46 waves)</option>
+                    <option value="BOSSRUSH">Boss Rush (5 waves)</option>
                     <option value="ENDLESS">Endless (∞)</option>
                 </select>
             </div>
@@ -164,6 +166,18 @@
                 <div class="tower-cost">$50000</div>
                 <div class="tower-hotkey">[C]</div>
             </div>
+            <div class="tower-card" id="chargerBtn" data-hotkey="Z">
+                <div class="tower-icon">⚡</div>
+                <div class="tower-name">Charger</div>
+                <div class="tower-cost">$3250</div>
+                <div class="tower-hotkey">[Z]</div>
+            </div>
+            <div class="tower-card" id="carrierCubeBtn" data-hotkey="X">
+                <div class="tower-icon">📦</div>
+                <div class="tower-name">Carrier Cube</div>
+                <div class="tower-cost">$200000</div>
+                <div class="tower-hotkey">[X]</div>
+            </div>
             <!-- Gunner Paragon is an upgrade, not a placeable tower -->
         </div>
     </div>
@@ -185,6 +199,14 @@
         </div>
     </div>
 
+    <!-- Carrier Cube Spawn Panel (Separate) -->
+    <div id="carrierSpawnPanel" style="display: none;">
+        <div class="panel-header">
+            <h3>Carrier Units</h3>
+        </div>
+        <div id="carrierUnitsGrid"></div>
+    </div>
+
     <!-- Cheat Menu Modal -->
     <div id="cheatModal" class="modal hidden">
         <div class="modal-content cheat-content">
@@ -200,7 +222,7 @@
                 <button id="maxTowersBtn" class="cheat-btn">⬆️ Max All Towers</button>
                 <button id="invincibleBtn" class="cheat-btn">🛡️ Toggle Invincible</button>
                 <button id="freeUpgradesBtn" class="cheat-btn">🆓 Free Upgrades</button>
-                <button id="speedUpBtn" class="cheat-btn">⚡ Speed x2</button>
+                <button id="speedUpBtn" class="cheat-btn">⚡ Speed x1</button>
                 <button id="spawnDummyBtn" class="cheat-btn">🎯 Spawn Test Dummy</button>
             </div>
             <div class="cheat-input-section">
@@ -217,6 +239,17 @@
                     <button id="setMoneyBtn" class="cheat-btn small">Set</button>
                 </div>
             </div>
+
+            <!-- Command Terminal Section -->
+            <div class="terminal-section">
+                <h3>💻 Command Terminal</h3>
+                <div id="terminalOutput" class="terminal-output"></div>
+                <div class="terminal-input-container">
+                    <div id="terminalHint" class="terminal-hint"></div>
+                    <input type="text" id="terminalInput" class="terminal-input"
+                        placeholder="Type command... (e.g., Help)" autocomplete="off">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -227,9 +260,15 @@
     <script src="Hard.js"></script>
     <script src="Insane.js"></script>
     <script src="Extra.js"></script>
+    <script src="BossRush.js"></script>
+    <script src="nightmare.js"></script>
     <!-- Load wave aggregator -->
     <script src="waves.js"></script>
+    <script src="carrierCube.js"></script>
     <script src="towers.js"></script>
+
+    <!-- Load command terminal system -->
+    <script src="commandTerminal.js"></script>
 
     <!-- Load main game script -->
     <script src="script.js"></script>

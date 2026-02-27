@@ -41,7 +41,9 @@ const towerButtons = {
     eliteSpawner: document.getElementById('eliteSpawnerBtn'),
     commander: document.getElementById('commanderBtn'),
     executive: document.getElementById('executiveBtn'),
-    cubeFactory: document.getElementById('cubeFactoryBtn') // ADD THIS LINE
+    cubeFactory: document.getElementById('cubeFactoryBtn'),
+    charger: document.getElementById('chargerBtn'),
+    carrierCube: document.getElementById('carrierCubeBtn')
 };
 
 // Cheat buttons
@@ -121,6 +123,21 @@ const GAME_MODES = {
             { name: "Gargantuar-X", hp: 14000, speed: 0.3, interval: 15, scaling: 2.2, color: '#800000', size: 35 },
             { name: "Katt Destructor", hp: 600000, speed: 0.2, interval: 50, scaling: 1.5, color: '#800000', size: 45 }
         ]
+    },
+    BOSSRUSH: {
+        name: "Boss Rush",
+        waves: 5,
+        difficultyMultiplier: 1.0,
+        cashMultiplier: 1.0,
+        bosses: []
+    },
+    NIGHTMARE: {
+        name: "Nightmare",
+        waves: 46,
+        difficultyMultiplier: 2.5,
+        cashMultiplier: 2.0,
+        startingCash: 2000,
+        bosses: []
     }
 };
 
@@ -129,13 +146,18 @@ const MAP_TYPES = {
     STANDARD: {
         name: "Standard",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
-                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -143,9 +165,14 @@ const MAP_TYPES = {
     STRAIGHT: {
         name: "Straight Line",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 2) },
-                { x: gridWidth - 1, y: Math.floor(gridHeight / 2) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(logicalH / 2) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -153,13 +180,18 @@ const MAP_TYPES = {
     INTERSECTION: {
         name: "Intersection",
         createPath: function (gridWidth, gridHeight) {
+            const logicalW = 35;
+            const logicalH = 22;
+            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
+            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
+
             const pathPoints = [
-                { x: 0, y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 4) },
-                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(gridHeight / 2) },
-                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
-                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
+                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 4) },
+                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
+                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
+                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -209,6 +241,7 @@ let selectedTowerForTimer = null;
 
 // Wave Management State
 let activeWaves = []; // Array of active wave objects
+let isGameOver = false; // Flag to prevent multiple game over triggers
 // Removed: currentWaveData, currentGroupIndex, groupWaitTimer, isWaitingAfterGroup, enemiesToSpawn, lastSpawnTime
 
 // Tower Types and Summon Types are now loaded from towers.js
@@ -220,6 +253,9 @@ let activeWaves = []; // Array of active wave objects
 
 // Initialize game
 function initGame() {
+    // Register Carrier Cube Type
+    TOWER_TYPES.CARRIER_CUBE = CARRIER_CUBE_TYPE;
+
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
@@ -244,9 +280,9 @@ function initGame() {
 
 // Resize canvas
 function resizeCanvas() {
-    // Set fixed canvas size for consistency across all devices
-    canvas.width = 1400;
-    canvas.height = 900;
+    // Set canvas size to fit the screen window
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     // Don't change game dimensions if game is active
     if (waveNumber > 0 || towers.length > 0) {
@@ -293,6 +329,9 @@ function createPath() {
     }));
 
     path = currentMap.createPath(gridWidth, gridHeight);
+
+    // Update window.path for command terminal access
+    window.path = path;
 }
 
 // Helper function to generate path from points
@@ -340,7 +379,9 @@ function setupEventListeners() {
     towerButtons.eliteSpawner.addEventListener('click', () => selectTowerType(TOWER_TYPES.ELITE_SPAWNER));
     towerButtons.commander.addEventListener('click', () => selectTowerType(TOWER_TYPES.COMMANDER));
     towerButtons.executive.addEventListener('click', () => selectTowerType(TOWER_TYPES.EXECUTIVE));
-    towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY)); // Added Cube Factory
+    towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY));
+    towerButtons.charger.addEventListener('click', () => selectTowerType(TOWER_TYPES.CHARGER));
+    towerButtons.carrierCube.addEventListener('click', () => selectTowerType(TOWER_TYPES.CARRIER_CUBE));
 
 
     // Canvas interactions
@@ -381,6 +422,7 @@ function setupEventListeners() {
     closeTowerInfo.addEventListener('click', () => {
         towerInfoPanel.style.display = 'none';
         towerActions.style.display = 'none';
+        document.getElementById('carrierSpawnPanel').style.display = 'none'; // Fix: Close carrier UI
         currentInfoTower = null;
         selectedCell = null; // Clear selected cell to hide range
     });
@@ -427,6 +469,14 @@ function setupEventListeners() {
     // Cheat menu
     cheatMenuBtn.addEventListener('click', () => {
         cheatModal.classList.remove('hidden');
+
+        // Initialize terminal if not already done
+        if (window.commandTerminal && !window.commandTerminal.outputElement) {
+            const terminalOutput = document.getElementById('terminalOutput');
+            const terminalInput = document.getElementById('terminalInput');
+            const terminalHint = document.getElementById('terminalHint');
+            window.commandTerminal.initialize(terminalOutput, terminalInput, terminalHint);
+        }
     });
 
     closeCheatModal.addEventListener('click', () => {
@@ -468,8 +518,8 @@ function setupEventListeners() {
         freeUpgradesBtn.textContent = freeUpgrades ? '🆓 Free: ON' : '🆓 Free Upgrades';
     });
     speedUpBtn.addEventListener('click', () => {
-        gameSpeed = gameSpeed === 1 ? 2 : 1;
-        speedUpBtn.textContent = gameSpeed === 2 ? '⚡ Speed: x2' : '⚡ Speed x2';
+        gameSpeed = gameSpeed >= 4 ? 1 : gameSpeed + 1;
+        speedUpBtn.textContent = `⚡ Speed x${gameSpeed}`;
     });
 
     const spawnDummyBtn = document.getElementById('spawnDummyBtn');
@@ -556,6 +606,10 @@ function setupEventListeners() {
             selectTowerType(TOWER_TYPES.EXECUTIVE);
         } else if (e.key === 'c' || e.key === 'C') { // Hotkey for Cube Factory
             selectTowerType(TOWER_TYPES.CUBE_FACTORY);
+        } else if (e.key === 'z' || e.key === 'Z') { // Hotkey for Charger
+            selectTowerType(TOWER_TYPES.CHARGER);
+        } else if (e.key === 'x' || e.key === 'X') { // Hotkey for Carrier Cube
+            selectTowerType(TOWER_TYPES.CARRIER_CUBE);
         }
 
 
@@ -586,6 +640,7 @@ function setupEventListeners() {
         modeDisplay.textContent = `${currentGameMode.name} - ${currentMap.name}`;
 
         // Reset game with new settings
+        if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
         resetGame(true);
     });
 }
@@ -605,6 +660,7 @@ function showMainMenu() {
     cheatModal.classList.add('hidden');
 
     // Reset game state
+    if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
     resetGame(false);
 }
 
@@ -634,7 +690,9 @@ function updateTowerButtonCosts() {
     document.querySelector('#eliteSpawnerBtn .tower-cost').textContent = '$' + TOWER_TYPES.ELITE_SPAWNER.cost;
     document.querySelector('#commanderBtn .tower-cost').textContent = '$' + TOWER_TYPES.COMMANDER.cost;
     document.querySelector('#executiveBtn .tower-cost').textContent = '$' + TOWER_TYPES.EXECUTIVE.cost;
-    document.querySelector('#cubeFactoryBtn .tower-cost').textContent = '$' + TOWER_TYPES.CUBE_FACTORY.cost; // ADDED
+    document.querySelector('#cubeFactoryBtn .tower-cost').textContent = '$' + TOWER_TYPES.CUBE_FACTORY.cost;
+    document.querySelector('#chargerBtn .tower-cost').textContent = '$' + TOWER_TYPES.CHARGER.cost;
+    document.querySelector('#carrierCubeBtn .tower-cost').textContent = '$' + TOWER_TYPES.CARRIER_CUBE.cost;
 }
 
 // Update tower selection UI
@@ -652,8 +710,9 @@ function updateTowerSelection() {
             [TOWER_TYPES.ELITE_SPAWNER]: towerButtons.eliteSpawner,
             [TOWER_TYPES.COMMANDER]: towerButtons.commander,
             [TOWER_TYPES.EXECUTIVE]: towerButtons.executive,
-            [TOWER_TYPES.CUBE_FACTORY]: towerButtons.cubeFactory // Added Cube Factory
-
+            [TOWER_TYPES.CUBE_FACTORY]: towerButtons.cubeFactory,
+            [TOWER_TYPES.CHARGER]: towerButtons.charger,
+            [TOWER_TYPES.CARRIER_CUBE]: towerButtons.carrierCube
         };
         const btn = btnMap[selectedTower];
         if (btn) btn.classList.add('selected');
@@ -754,6 +813,28 @@ function handleMouseMove(event) {
         return;
     }
 
+    // If in bomber targeting mode, update preview
+    if (carrierTargetingMode && carrierTargetingUnit === CARRIER_UNITS.BOMBER) {
+        // Snap to grid center
+        const snappedX = Math.floor(mouseX / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+        const snappedY = Math.floor(mouseY / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+
+        const level = carrierTargetingTower.level;
+        const area = level === 1 ? CARRIER_UNITS.BOMBER.area : CARRIER_UNITS.BOMBER.areaL2;
+        const range = (area * GRID_SIZE) / 2;
+
+        // Store preview data
+        window.bomberTargetPreview = {
+            x: snappedX,
+            y: snappedY,
+            range: range
+        };
+        return;
+    } else {
+        window.bomberTargetPreview = null;
+        hoveredEnemy = null;
+    }
+
     // If in tower placement mode, update selectedCell for placement preview
     if (selectedTower) {
         selectedCell = { x: gridX, y: gridY };
@@ -818,15 +899,68 @@ function showTowerInfo(tower) {
             </div>
         `;
     } else if (type.summons && currentStats.summons) {
-        infoHTML += `<div class="info-row"><div class="info-label">Summons:</div></div>`;
+        infoHTML += `<div class="info-row" style="margin-bottom: 8px;"><div class="info-label" style="color: #00ff88; font-weight: bold;">📦 Summons:</div></div>`;
         currentStats.summons.forEach(summon => {
-            infoHTML += `<div class="info-row"><div class="info-value">${SUMMON_TYPES[summon.type].name}: ${summon.spawnRate / 1000}s</div></div>`;
+            const summonType = SUMMON_TYPES[summon.type];
+            let summonDPS = 0;
+            let summonInfo = '';
+
+            // Calculate DPS based on summon's attack type
+            if (summonType.damage && summonType.fireRate) {
+                summonDPS = Math.floor(summonType.damage / (summonType.fireRate / 1000));
+                summonInfo = `⚔️ ${summonDPS} DPS`;
+            } else if (summonType.burstDamage && summonType.burstCount && summonType.burstCooldown) {
+                // Burst damage type (Pink Square L5)
+                const totalBurstDamage = summonType.burstDamage * summonType.burstCount;
+                summonDPS = Math.floor(totalBurstDamage / (summonType.burstCooldown / 1000));
+                summonInfo = `⚔️ ${summonDPS} DPS (burst)`;
+            } else if (summonType.minigunDamage && summonType.minigunFireRate) {
+                // Multi-weapon (Cyan, Factory cubes)
+                const minigunDPS = Math.floor(summonType.minigunDamage / (summonType.minigunFireRate / 1000));
+                summonDPS = minigunDPS;
+                if (summonType.railgunDamage && summonType.railgunFireRate) {
+                    summonDPS += Math.floor(summonType.railgunDamage / (summonType.railgunFireRate / 1000));
+                }
+                summonInfo = `⚔️ ${summonDPS}+ DPS`;
+            } else if (summonType.selfDestructDamage) {
+                summonInfo = `💥 ${summonType.selfDestructDamage.toLocaleString()} on death`;
+            } else if (summonType.isKamikaze) {
+                summonInfo = `💀 Kamikaze ${summonType.deathDamage.toLocaleString()} dmg`;
+            } else {
+                summonInfo = `🛡️ Tank`;
+            }
+
+            infoHTML += `
+                <div class="info-row" style="margin-left: 8px; padding: 4px 0; border-left: 2px solid ${summonType.color}; padding-left: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span style="color: ${summonType.color}; font-weight: bold;">${summonType.name}</span>
+                        <span style="color: #aaa; font-size: 11px;">${summon.spawnRate / 1000}s</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 10px; color: #888; margin-top: 2px;">
+                        <span>❤️ ${summonType.hp.toLocaleString()} HP</span>
+                        <span>${summonInfo}</span>
+                    </div>
+                </div>
+            `;
         });
     } else if (type.farm) {
+        // Calculate total farm income
+        let totalFarmIncome = 0;
+        towers.forEach(t => {
+            if (t.type.farm) {
+                const farmStats = t.type.levels[t.level - 1];
+                totalFarmIncome += farmStats.cashPerWave;
+            }
+        });
+
         infoHTML += `
-            <div class="info-row">
-                <div class="info-label">Income/Wave</div>
-                <div class="info-value">$${currentStats.cashPerWave}</div>
+            <div class="info-row" style="border-left-color: #FFD700;">
+                <div class="info-label">💰 Income/Wave</div>
+                <div class="info-value" style="color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);">$${currentStats.cashPerWave.toLocaleString()}</div>
+            </div>
+            <div class="info-row" style="border-left-color: #32CD32;">
+                <div class="info-label">📊 Total Farm Income</div>
+                <div class="info-value" style="color: #32CD32;">$${totalFarmIncome.toLocaleString()}/wave</div>
             </div>
         `;
     } else if (type === TOWER_TYPES.GUNNER_PARAGON) {
@@ -880,6 +1014,119 @@ function showTowerInfo(tower) {
                 <div class="info-value">Snipers +${currentStats.sniperBuff} dmg${currentStats.railgunnerBuff ? ` | Railgunners +${currentStats.railgunnerBuff} dmg` : ''}</div>
             </div>` : ''}
         `;
+    } else if (type.isCharger) {
+        // Charger tower - show damage range and charge mechanics
+        const buffs = (currentStats.cannotBeBuffed || type.cannotBeBuffed) ?
+            { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
+        const buffedRange = currentStats.range + buffs.rangeBoost;
+        const buffedFireRate = currentStats.fireRate * (1 - buffs.fireRateBoost);
+
+        // Calculate current charge bonus
+        let chargeBonus = 0;
+        let isAtMaxCharge = false;
+        if (currentStats.chargeMaxMin && currentStats.chargeMaxMax && tower.isCharging && tower.lockedTarget) {
+            const chargeTime = performance.now() - tower.chargeStartTime;
+            const chargeTicks = Math.floor(chargeTime / currentStats.chargeInterval);
+            chargeBonus = chargeTicks * currentStats.chargeRate;
+
+            // Check if we've reached max charge
+            const maxPossibleBonus = currentStats.chargeMaxMax - currentStats.damageMin;
+            if (chargeBonus >= maxPossibleBonus) {
+                isAtMaxCharge = true;
+                chargeBonus = maxPossibleBonus;
+            }
+        }
+
+        // Show damage with current charge bonus
+        let damageDisplay = `${currentStats.damageMin}-${currentStats.damageMax}`;
+        if (currentStats.chargeMaxMin && currentStats.chargeMaxMax) {
+            if (isAtMaxCharge) {
+                // At max charge, show as pure random between max range
+                damageDisplay = `${currentStats.chargeMaxMin}-${currentStats.chargeMaxMax}`;
+            } else if (chargeBonus > 0) {
+                // Show current charged damage range
+                const currentMin = currentStats.damageMin + chargeBonus;
+                const currentMax = currentStats.damageMax + chargeBonus;
+                damageDisplay = `${currentStats.damageMin}-${currentStats.damageMax} → ${currentMin}-${currentMax} (Max: ${currentStats.chargeMaxMin}-${currentStats.chargeMaxMax})`;
+            } else {
+                damageDisplay += ` (Max: ${currentStats.chargeMaxMin}-${currentStats.chargeMaxMax})`;
+            }
+        }
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Damage</div>
+                <div class="info-value">${damageDisplay}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Range</div>
+                <div class="info-value">${buffedRange}${buffs.rangeBoost > 0 ? ` (+${buffs.rangeBoost})` : ''} tiles</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Fire Rate</div>
+                <div class="info-value">${(buffedFireRate / 1000).toFixed(2)}s${buffs.fireRateBoost > 0 ? ` (-${(buffs.fireRateBoost * 100).toFixed(0)}%)` : ''}</div>
+            </div>
+        `;
+
+        // Show charge rate for levels 4-5
+        if (currentStats.chargeMaxMin && currentStats.chargeMaxMax) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Charge Rate</div>
+                    <div class="info-value">+${currentStats.chargeRate}/0.1s</div>
+                </div>
+            `;
+        }
+
+        // Calculate current DPS using actual last damage dealt (updates every 50ms)
+        let currentDPS = 0;
+        if (tower.lastDamageDealt > 0 && tower.lastDamageTime) {
+            const timeSinceLastDamage = performance.now() - tower.lastDamageTime;
+            // Only show current DPS if damage was dealt recently (within 50ms)
+            if (timeSinceLastDamage < 50) {
+                currentDPS = ((tower.lastDamageDealt / buffedFireRate) * 1000).toFixed(1);
+            }
+        }
+
+        const minDPS = ((currentStats.damageMin / buffedFireRate) * 1000).toFixed(1);
+        let maxDPS;
+        if (currentStats.chargeMaxMin && currentStats.chargeMaxMax) {
+            // For charging levels, max DPS uses max charged damage
+            maxDPS = ((currentStats.chargeMaxMax / buffedFireRate) * 1000).toFixed(1);
+        } else {
+            // For non-charging levels, max DPS uses base max damage
+            maxDPS = ((currentStats.damageMax / buffedFireRate) * 1000).toFixed(1);
+        }
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">DPS</div>
+                <div class="info-value">Min: ${minDPS}/s | Max: ${maxDPS}/s${currentDPS > 0 ? ` (Current: ${currentDPS}/s)` : ''}</div>
+            </div>
+        `;
+
+        // Show cooldown status (when target was lost)
+        if (tower.lastTargetLostTime) {
+            const timeSinceLost = performance.now() - tower.lastTargetLostTime;
+            const cooldownRemaining = Math.max(0, type.targetCooldown - timeSinceLost);
+            if (cooldownRemaining > 0) {
+                infoHTML += `
+                    <div class="info-row">
+                        <div class="info-label">Cooldown</div>
+                        <div class="info-value">${(cooldownRemaining / 1000).toFixed(1)}s</div>
+                    </div>
+                `;
+            }
+        }
+
+        // Show cannot be buffed for levels 4-5
+        if (currentStats.cannotBeBuffed) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-value" style="text-align:center; color:#FF6B6B;">❌ Cannot Be Buffed</div>
+                </div>
+            `;
+        }
     } else {
         // Get Commander buffs
         const buffs = getCommanderBuffs(tower);
@@ -934,6 +1181,16 @@ function showTowerInfo(tower) {
                 <div class="info-row">
                     <div class="info-label">Next Income</div>
                     <div class="info-value">$${nextStats.cashPerWave}/wave</div>
+                </div>
+            `;
+        } else if (type.isCharger) {
+            const damageDisplay = nextStats.chargeMaxMin && nextStats.chargeMaxMax ?
+                `${nextStats.damageMin}-${nextStats.damageMax} (Max: ${nextStats.chargeMaxMin}-${nextStats.chargeMaxMax})` :
+                `${nextStats.damageMin}-${nextStats.damageMax}`;
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Next Level</div>
+                    <div class="info-value">DMG: ${damageDisplay}, Range: ${nextStats.range}</div>
                 </div>
             `;
         } else {
@@ -1073,9 +1330,82 @@ function showTowerInfo(tower) {
         } else {
             ability2TowerBtn.style.display = 'none';
         }
+        ability2TowerBtn.style.display = 'none';
+    } else if (type.isCarrier) {
+        // Carrier Cube UI - Show efficiency modules and per-unit states
+        const em = tower.em || 0;
+
+        const levelStats = type.levels[level - 1];
+        const emCap = levelStats.emCap || type.efficiencyCap || 20;
+        const emGainRate = levelStats.emGainPerSec || 1;
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Efficiency Modules</div>
+                <div class="info-value" style="width: 120px; position: relative; height: 16px; background: rgba(0,0,0,0.5); border: 1px solid #00FFFF; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${(em / emCap) * 100}%; height: 100%; background: linear-gradient(90deg, #008888, #00FFFF); transition: width 0.2s;"></div>
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; text-shadow: 1px 1px 2px black; color: #fff;">
+                        ${em} / ${emCap}
+                    </div>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">EM Generation</div>
+                <div class="info-value" style="color: #88FFFF;">+${emGainRate}/sec</div>
+            </div>
+        `;
+
+        // Show individual unit states
+        const units = [CARRIER_UNITS.BOMBER, CARRIER_UNITS.BLISMA];
+        if (tower.level >= 2) {
+            units.push(CARRIER_UNITS.REFRACTOR, CARRIER_UNITS.MOAB, CARRIER_UNITS.GOLIATH);
+        }
+
+        infoHTML += `<div class="info-row"><div class="info-label" style="font-weight:bold;">Unit Status:</div></div>`;
+
+        units.forEach(unit => {
+            if (!tower.unitState) tower.unitState = {};
+            const unitState = tower.unitState[unit.name] || { cooldownState: 'READY', usageCount: 0, cooldownEndTime: 0 };
+            const currentTime = performance.now();
+            const cooldownRemaining = Math.max(0, (unitState.cooldownEndTime - currentTime) / 1000);
+            const isOnCooldown = cooldownRemaining > 0;
+
+            let statusColor = '#00FF00'; // Green for READY
+            let statusText = 'READY';
+
+            if (isOnCooldown) {
+                if (unitState.cooldownState === 'PAYBACK') {
+                    statusColor = '#FF0000';
+                    statusText = `LOCKED ${cooldownRemaining.toFixed(1)}s`;
+                } else if (unitState.cooldownState === 'FULL_COOLDOWN') {
+                    statusColor = '#FF6600';
+                    statusText = `FULL ${cooldownRemaining.toFixed(1)}s [${unitState.usageCount}/${unit.hardLimit || 3}]`;
+                } else if (unitState.cooldownState === 'COOLDOWN') {
+                    statusColor = '#FFCC00';
+                    statusText = `CD ${cooldownRemaining.toFixed(1)}s [${unitState.usageCount}/${unit.limit || 2}]`;
+                }
+            }
+
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">${unit.name}</div>
+                    <div class="info-value" style="color: ${statusColor};">
+                        ${statusText} <span style="color: #88FFFF;">(${unit.emCost} EM)</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        abilityTowerBtn.style.display = 'none';
+        ability2TowerBtn.style.display = 'none';
+
+        // Show separate spawn UI
+        showCarrierSpawnUI(tower);
     } else {
         abilityTowerBtn.style.display = 'none';
         ability2TowerBtn.style.display = 'none';
+        // Hide separate spawn UI if not carrier
+        document.getElementById('carrierSpawnPanel').style.display = 'none';
     }
 
     // Show the panel and buttons
@@ -1084,6 +1414,263 @@ function showTowerInfo(tower) {
 
     // Store selected tower for timer display
     selectedTowerForTimer = tower;
+}
+
+// Show Carrier Spawn UI
+function showCarrierSpawnUI(tower) {
+    const panel = document.getElementById('carrierSpawnPanel');
+    const container = document.getElementById('carrierUnitsGrid');
+    if (!panel || !container) return;
+
+    // Clean up any existing tooltips before creating new ones
+    document.querySelectorAll('.carrier-tooltip').forEach(t => t.remove());
+
+    panel.style.display = 'block';
+    container.innerHTML = ''; // Clear previous buttons
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    container.style.gap = '8px';
+    container.style.marginTop = '10px';
+
+    // Add or update EMC progress bar
+    let emcBar = document.getElementById('emcProgressBar');
+    if (!emcBar) {
+        emcBar = document.createElement('div');
+        emcBar.id = 'emcProgressBar';
+        panel.insertBefore(emcBar, container);
+    }
+
+    const currentEM = tower.em || 0;
+    const levelStats = tower.type.levels[tower.level - 1];
+    const maxEM = levelStats.emCap || tower.type.efficiencyCap || 20;
+    const emPercent = Math.min(100, (currentEM / maxEM) * 100);
+
+    emcBar.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 12px; color: #88FFFF; font-weight: bold;">⚡ Efficiency Modules</span>
+            <span style="font-size: 14px; color: #FFFFFF; font-weight: bold;">${currentEM}/${maxEM}</span>
+        </div>
+        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.5); border-radius: 5px; overflow: hidden; border: 1px solid rgba(0,255,255,0.3);">
+            <div style="
+                width: ${emPercent}%;
+                height: 100%;
+                background: linear-gradient(90deg, #00FFFF, #00BFFF, #00FFFF);
+                border-radius: 5px;
+                box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+                transition: width 0.3s ease;
+            "></div>
+        </div>
+    `;
+
+    const units = [CARRIER_UNITS.BOMBER, CARRIER_UNITS.BLISMA];
+    if (tower.level >= 2) {
+        units.push(CARRIER_UNITS.REFRACTOR, CARRIER_UNITS.MOAB, CARRIER_UNITS.GOLIATH);
+    }
+
+    units.forEach(unit => {
+        const btn = document.createElement('button');
+        btn.className = 'carrier-unit-btn';
+        btn.style.cssText = `
+            font-size: 11px;
+            padding: 8px 5px;
+            background: linear-gradient(135deg, ${unit.color}cc 0%, ${unit.color}88 100%);
+            border: 2px solid ${unit.color};
+            border-radius: 8px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        `;
+
+        const canAfford = (tower.em || 0) >= unit.emCost;
+
+        // Get per-unit state
+        if (!tower.unitState) tower.unitState = {};
+        const unitState = tower.unitState[unit.name] || { cooldownState: 'READY', usageCount: 0, cooldownEndTime: 0 };
+        const currentTime = performance.now();
+
+        // Calculate cooldown remaining
+        const cooldownRemaining = Math.max(0, (unitState.cooldownEndTime - currentTime) / 1000);
+        const isOnCooldown = cooldownRemaining > 0;
+        const isPayback = unitState.cooldownState === 'PAYBACK' && isOnCooldown;
+        const isFullCooldown = unitState.cooldownState === 'FULL_COOLDOWN' && isOnCooldown;
+        const isCooldown = unitState.cooldownState === 'COOLDOWN' && isOnCooldown;
+
+        // Get limits
+        const limit = unit.limit || 2;
+        const hardLimit = unit.hardLimit || 3;
+
+        btn.disabled = !canAfford || isPayback;
+        if (isPayback) {
+            btn.style.opacity = '0.4';
+            btn.style.border = '2px solid #ff0000';
+        } else if (isFullCooldown) {
+            btn.style.opacity = '0.7';
+            btn.style.border = '2px solid #ff6600';
+        } else if (isCooldown) {
+            btn.style.opacity = '0.85';
+        }
+
+        // Get stat info based on unit type
+        let statsInfo = '';
+        let tooltipContent = '';
+
+        if (unit === CARRIER_UNITS.BOMBER) {
+            const dmg = tower.level >= 2 ? unit.damageL2 : unit.damage;
+            const area = tower.level >= 2 ? unit.areaL2 : unit.area;
+            statsInfo = `💣 Airstrike`;
+            tooltipContent = `
+                <div style="font-weight: bold; color: ${unit.color}; margin-bottom: 8px; font-size: 14px;">🛩️ Bomber Airstrike</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>📐 Area: <span style="color: #fff;">${area}×${area} tiles</span></div>
+                    <div>💥 Damage: <span style="color: #ff6666;">${dmg} × ${unit.count} hits</span></div>
+                    <div>⏱️ Delay: <span style="color: #ffcc00;">3s targeting</span></div>
+                    <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
+                </div>
+            `;
+        } else if (unit === CARRIER_UNITS.BLISMA) {
+            statsInfo = `🎯 Hunter`;
+            tooltipContent = `
+                <div style="font-weight: bold; color: ${unit.color}; margin-bottom: 8px; font-size: 14px;">🎯 Blisma Hunter</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>⏳ Duration: <span style="color: #fff;">${unit.duration / 1000}s on field</span></div>
+                    <div>💥 Damage: <span style="color: #ff6666;">${unit.damage} × ${unit.burstCount} burst</span></div>
+                    <div>⚡ Burst Rate: <span style="color: #ffcc00;">${unit.burstRate}ms intervals</span></div>
+                    <div>🔫 Fire Rate: <span style="color: #aaa;">${unit.fireRate / 1000}s between bursts</span></div>
+                    <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
+                </div>
+            `;
+        } else if (unit === CARRIER_UNITS.REFRACTOR) {
+            statsInfo = `⚡ Beam`;
+            tooltipContent = `
+                <div style="font-weight: bold; color: ${unit.color}; margin-bottom: 8px; font-size: 14px;">⚡ Refractor Beam</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>⏳ Duration: <span style="color: #fff;">${unit.duration / 1000}s on field</span></div>
+                    <div>💥 Base Damage: <span style="color: #ff6666;">${unit.damage}/hit</span></div>
+                    <div>📈 Stacking: <span style="color: #00ffff;">+${unit.damageInc} per hit</span></div>
+                    <div>⚡ Fire Rate: <span style="color: #ffcc00;">${unit.fireRate}ms</span></div>
+                    <div>🎯 Target: <span style="color: #aaa;">Single (closest)</span></div>
+                    <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
+                </div>
+            `;
+        } else if (unit === CARRIER_UNITS.MOAB) {
+            statsInfo = `☢️ Nuke`;
+            tooltipContent = `
+                <div style="font-weight: bold; color: ${unit.color}; margin-bottom: 8px; font-size: 14px;">☢️ MOAB Strike</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>💥 Damage: <span style="color: #ff4444; font-weight: bold;">${unit.damage.toLocaleString()}</span></div>
+                    <div>🌍 Range: <span style="color: #ffcc00;">GLOBAL (all enemies)</span></div>
+                    <div>💰 Cost: <span style="color: #ffd700;">$${unit.cost.toLocaleString()}</span></div>
+                    <div>⚠️ Limit: <span style="color: #ff6666;">1 per cooldown</span></div>
+                    <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
+                </div>
+            `;
+        } else if (unit === CARRIER_UNITS.GOLIATH) {
+            const minigunDPS = Math.floor(unit.minigunDamage / (unit.minigunRate / 1000));
+            const railgunDPS = Math.floor(unit.railgunDamage / (unit.railgunRate / 1000));
+            const missileDPS = Math.floor((unit.missileDamage * unit.missileCount) / (unit.missileRate / 1000));
+            statsInfo = `🤖 Mech`;
+            tooltipContent = `
+                <div style="font-weight: bold; color: ${unit.color}; margin-bottom: 8px; font-size: 14px;">🤖 Goliath Mech</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>⏳ Duration: <span style="color: #fff;">${unit.duration / 1000}s on field</span></div>
+                    <div style="color: #ffcc00; margin-top: 6px;">── Weapons ──</div>
+                    <div>🔫 Minigun: <span style="color: #ff6666;">${minigunDPS} DPS</span></div>
+                    <div>⚡ Railgun: <span style="color: #00bfff;">${railgunDPS} DPS</span> (strongest)</div>
+                    <div>🚀 Missiles: <span style="color: #ff8800;">${missileDPS} DPS</span> (${unit.missileRange} tile AOE)</div>
+                    <div style="margin-top: 4px;">💰 Cost: <span style="color: #ffd700;">$${unit.cost.toLocaleString()}</span></div>
+                    <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
+                </div>
+            `;
+        }
+
+        // Create cooldown bar
+        let cooldownHTML = '';
+        if (isOnCooldown) {
+            let totalCooldown = unit.cooldown;
+            if (isFullCooldown) totalCooldown = unit.fullCooldown || 15000;
+            if (isPayback) totalCooldown = unit.paybackCooldown || 20000;
+
+            const cooldownPercent = ((totalCooldown / 1000 - cooldownRemaining) / (totalCooldown / 1000)) * 100;
+            const stateColor = isPayback ? '#ff0000' : (isFullCooldown ? '#ff6600' : '#ffcc00');
+            const stateLabel = isPayback ? '🔒 LOCKED' : (isFullCooldown ? '⚠️ FULL' : '⏱️');
+
+            cooldownHTML = `
+                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background: rgba(0,0,0,0.5);">
+                    <div style="width: ${cooldownPercent}%; height: 100%; background: ${stateColor}; transition: width 0.1s;"></div>
+                </div>
+                <div style="font-size: 9px; color: ${stateColor};">${stateLabel} ${cooldownRemaining.toFixed(1)}s</div>
+            `;
+        }
+
+        // Show usage count if any
+        let usageHTML = '';
+        if (unitState.usageCount > 0 && isOnCooldown) {
+            usageHTML = `<div style="font-size: 8px; color: #aaa;">${unitState.usageCount}/${isFullCooldown ? hardLimit : limit}</div>`;
+        }
+
+        btn.innerHTML = `
+            <div style="font-weight: bold; font-size: 12px;">${unit.name.replace(' Cube', '')}</div>
+            <div style="font-size: 9px; opacity: 0.9;">${statsInfo}</div>
+            <div style="font-size: 10px; color: ${canAfford ? '#00ff00' : '#ff6666'};">${unit.emCost} EM</div>
+            ${usageHTML}
+            ${cooldownHTML}
+        `;
+
+        // Create tooltip element
+        const tooltip = document.createElement('div');
+        tooltip.className = 'carrier-tooltip';
+        tooltip.innerHTML = tooltipContent;
+        tooltip.style.cssText = `
+            position: fixed;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 2px solid ${unit.color};
+            border-radius: 12px;
+            padding: 12px 16px;
+            color: #ccc;
+            font-size: 11px;
+            pointer-events: none;
+            z-index: 10001;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${unit.color}44;
+            min-width: 200px;
+            max-width: 280px;
+        `;
+        document.body.appendChild(tooltip);
+
+        btn.onmouseenter = (e) => {
+            if (!btn.disabled) {
+                btn.style.transform = 'translateY(-2px)';
+                btn.style.boxShadow = `0 4px 15px ${unit.color}88`;
+            }
+            // Position and show tooltip
+            const rect = btn.getBoundingClientRect();
+            tooltip.style.left = `${rect.right + 10}px`;
+            tooltip.style.top = `${rect.top}px`;
+            tooltip.style.opacity = '1';
+        };
+        btn.onmouseleave = () => {
+            btn.style.transform = 'none';
+            btn.style.boxShadow = 'none';
+            tooltip.style.opacity = '0';
+        };
+
+        btn.onclick = () => triggerCarrierAbility(tower, unit);
+
+        container.appendChild(btn);
+    });
+
+    // Clean up old tooltips when panel is hidden
+    const existingTooltips = document.querySelectorAll('.carrier-tooltip');
+    // Keep only the newly created tooltips (already handled in forEach)
 }
 
 
@@ -1095,6 +1682,8 @@ function sellTower(tower) {
         towerSizeX = 2; towerSizeY = 2;
     } else if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
         towerSizeX = 3; towerSizeY = 3;
+    } else if (tower.type === TOWER_TYPES.CARRIER_CUBE) {
+        towerSizeX = 4; towerSizeY = 4;
     }
 
     // Clear grid cells occupied by the tower
@@ -1143,6 +1732,7 @@ function sellTower(tower) {
 
     // Hide tower info panel
     towerInfoPanel.style.display = 'none';
+    document.getElementById('carrierSpawnPanel').style.display = 'none';
     currentInfoTower = null;
     selectedCell = null; // Clear selected cell to hide range
 }
@@ -1376,6 +1966,8 @@ function placeTower(gridX, gridY) {
         towerSizeX = 2; towerSizeY = 2;
     } else if (selectedTower === TOWER_TYPES.CUBE_FACTORY) {
         towerSizeX = 3; towerSizeY = 3;
+    } else if (selectedTower === TOWER_TYPES.CARRIER_CUBE) {
+        towerSizeX = 4; towerSizeY = 4;
     }
 
     // --- STEP 1: Global Tower Limit Check ---
@@ -1422,7 +2014,14 @@ function placeTower(gridX, gridY) {
         lastFired: 0,
         target: null,
         lastSummonTimes: {}, // Initialize lastSummonTimes
-        isFiring: false
+        isFiring: false,
+        // Charger-specific properties
+        lockedTarget: null,
+        lastTargetLostTime: 0,
+        chargeStartTime: 0,
+        isCharging: false,
+        lastDamageDealt: 0,
+        lastDamageTime: 0
     };
     towers.push(tower);
 
@@ -1958,7 +2557,7 @@ function generateFarmCash() {
             const effect = { x: tower.x, y: tower.y - 10, text: `+$${cashAmount}`, alpha: 1, time: 0 };
             cashEffects.push(effect);
             const div = document.createElement('div');
-            div.className = 'cashEffect';
+            div.className = 'cash-effect';
             div.style.left = `${tower.x}px`;
             div.style.top = `${tower.y - 10}px`;
             div.textContent = effect.text;
@@ -2019,6 +2618,22 @@ function spawnWave() {
         currentWaves = INSANE_WAVES;
     } else if (currentGameMode === GAME_MODES.ENDLESS) {
         currentWaves = EXTRA_WAVES;
+    } else if (currentGameMode === GAME_MODES.BOSSRUSH) {
+        // Safeguard: Ensure waves are loaded
+        if ((!window.BOSSRUSH_WAVES || window.BOSSRUSH_WAVES.length === 0) && typeof generateBossRushWaves === 'function') {
+            console.log("Re-initializing Boss Rush waves...");
+            window.BOSSRUSH_WAVES = generateBossRushWaves();
+        }
+        currentWaves = window.BOSSRUSH_WAVES;
+        console.log("Boss Rush Waves loaded:", currentWaves ? currentWaves.length : 0);
+    } else if (currentGameMode === GAME_MODES.NIGHTMARE) {
+        // Safeguard: Ensure waves are loaded
+        if ((!window.NIGHTMARE_WAVES || window.NIGHTMARE_WAVES.length === 0) && typeof generateNightmareWaves === 'function') {
+            console.log("Re-initializing Nightmare waves...");
+            window.NIGHTMARE_WAVES = generateNightmareWaves();
+        }
+        currentWaves = window.NIGHTMARE_WAVES;
+        console.log("Nightmare Waves loaded:", currentWaves ? currentWaves.length : 0);
     } else {
         currentWaves = NORMAL_WAVES; // Fallback
     }
@@ -2083,14 +2698,14 @@ function shuffleArray(array) {
 }
 
 // Spawn single entity
-function spawnEntity(entityType, x, y, isSummon = false) {
+function spawnEntity(entityType, x, y, isSummon = false, isAlly = false) {
     // Apply Insane mode buffs
     let hp = entityType.hp || entityType.baseHp;
     let shield = entityType.hasShield ? (entityType.shieldHp || 0) : 0;
     let speed = entityType.speed;
 
     // Apply special Straight Line map stats (if they exist)
-    if (currentMap === MAP_TYPES.STRAIGHT && !isSummon) {
+    if (currentMap === MAP_TYPES.STRAIGHT && !isSummon && !isAlly) {
         if (entityType.insaneHp) {
             hp = entityType.insaneHp;
         }
@@ -2115,6 +2730,7 @@ function spawnEntity(entityType, x, y, isSummon = false) {
         size: entityType.size,
         distanceTraveled: isSummon ? getPathLength() : 0,
         isSummon: isSummon,
+        isAlly: isAlly,
         lastFired: 0,
         lastMissile: 0,
         missileCount: 0,
@@ -2133,11 +2749,45 @@ function spawnEntity(entityType, x, y, isSummon = false) {
         resistance: entityType.resistance || null
     };
     enemies.push(entity);
+
+    // ═══════════════════════════════════════════════════════════════
+    // OMEGA BOSS INITIAL SUMMONS
+    // When Omega is first spawned, immediately spawn 2 Omega Summons
+    // ═══════════════════════════════════════════════════════════════
+    if (entityType.name === 'THE OMEGA CUBE' && entityType.isSummoner && !isSummon) {
+        const omegaSummonType = ENEMY_TYPES.omegasummon_nm;
+        if (omegaSummonType) {
+            for (let j = 0; j < 2; j++) {
+                const summon = {
+                    type: omegaSummonType,
+                    x: entity.x + (j * 30),
+                    y: entity.y,
+                    hp: omegaSummonType.baseHp,
+                    maxHp: omegaSummonType.baseHp,
+                    shield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
+                    maxShield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
+                    speed: omegaSummonType.speed,
+                    distanceTraveled: 0,
+                    size: omegaSummonType.size,
+                    isSummoned: true
+                };
+                enemies.push(summon);
+            }
+            console.log(`Omega Boss spawned! Initial 2 Omega Summons deployed!`);
+        }
+    }
 }
+
+// Expose to command terminal
+window.spawnEntity = spawnEntity;
+window.path = path;
 
 function updateTowerInfoPeriodically(timestamp) {
     if (currentInfoTower && towers.includes(currentInfoTower) && timestamp - lastTowerInfoUpdate > 1000) {
         showTowerInfo(currentInfoTower);
+        if (currentInfoTower.type.isCarrier) {
+            showCarrierSpawnUI(currentInfoTower);
+        }
     }
 }
 
@@ -2161,11 +2811,15 @@ function gameLoop(timestamp) {
         updateWave(timestamp);
         updateEnemies(timestamp);
         drawEntities();
+        drawCarrierUnits(ctx); // Draw Air Units
         updateExplosions(timestamp);
         drawExplosions();
         drawRailgunShots();
+        drawChargerBeams();
         updateRailgunShots(timestamp);
         updateProjectiles(timestamp);
+        updateCarrierCubes(timestamp); // Update Carrier Cube towers
+        updateCarrierUnits(); // Update Air Units
         updateOrbitalStrike(timestamp);
         updateTowerInfoPeriodically(timestamp);
         checkWaveComplete();
@@ -2213,6 +2867,8 @@ function drawSelectedTowerRange() {
             previewSizeX = 2; previewSizeY = 2;
         } else if (selectedTower === TOWER_TYPES.CUBE_FACTORY) {
             previewSizeX = 3; previewSizeY = 3;
+        } else if (selectedTower === TOWER_TYPES.CARRIER_CUBE) {
+            previewSizeX = 4; previewSizeY = 4;
         }
         ctx.fillRect(selectedCell.x * GRID_SIZE, selectedCell.y * GRID_SIZE, previewSizeX * GRID_SIZE, previewSizeY * GRID_SIZE);
         ctx.globalAlpha = 1.0;
@@ -2222,7 +2878,7 @@ function drawSelectedTowerRange() {
 
         if (hoveredTower && !hoveredTower.type.farm && !hoveredTower.type.summons && !hoveredTower.type.support) {
             const stats = hoveredTower.type.levels[hoveredTower.level - 1];
-            const buffs = hoveredTower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(hoveredTower);
+            const buffs = (stats.cannotBeBuffed || hoveredTower.type.cannotBeBuffed) ? { rangeBoost: 0 } : getCommanderBuffs(hoveredTower);
             const rangeBonus = hoveredTower.type.rangeBonus || 0;
             const buffedRange = (stats.range + buffs.rangeBoost + rangeBonus) * GRID_SIZE;
             ctx.beginPath();
@@ -2306,6 +2962,36 @@ function updateRailgunShots(timestamp) {
     });
 }
 
+// Draw Charger laser beams
+function drawChargerBeams() {
+    for (const tower of towers) {
+        if (tower.type.isCharger && tower.isFiring && tower.lockedTarget && tower.lockedTarget.hp > 0) {
+            // Draw inner beam (bright aqua)
+            ctx.strokeStyle = '#00FFFF';
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00FFFF';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y);
+            ctx.lineTo(tower.lockedTarget.x, tower.lockedTarget.y);
+            ctx.stroke();
+
+            // Draw outer glow (white)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#FFFFFF';
+            ctx.beginPath();
+            ctx.moveTo(tower.x, tower.y);
+            ctx.lineTo(tower.lockedTarget.x, tower.lockedTarget.y);
+            ctx.stroke();
+
+            // Reset shadow
+            ctx.shadowBlur = 0;
+        }
+    }
+}
+
 // Update towers
 function updateTowers(timestamp) {
     for (const tower of towers) {
@@ -2356,6 +3042,88 @@ function updateTowers(timestamp) {
         }
         // --- End Summoner Logic ---
 
+        // --- Charger Tower Logic ---
+        else if (tower.type.isCharger && stats.damageMin && stats.damageMax) {
+            // Charger cannot be buffed at levels 4-5
+            const buffs = (stats.cannotBeBuffed || tower.type.cannotBeBuffed) ?
+                { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
+            const buffedFireRate = stats.fireRate * (1 - buffs.fireRateBoost);
+
+            // Check if current target is invalid
+            const targetInvalid = !tower.lockedTarget ||
+                tower.lockedTarget.hp <= 0 ||
+                !enemies.includes(tower.lockedTarget);
+
+            // Check if target went out of range
+            if (tower.lockedTarget && !isInRange(tower, tower.lockedTarget)) {
+                // Target escaped, trigger 3-second cooldown
+                tower.lastTargetLostTime = timestamp;
+                tower.lockedTarget = null;
+                tower.isCharging = false;
+            }
+
+            // Clear target when it dies and trigger cooldown
+            if (tower.lockedTarget && tower.lockedTarget.hp <= 0) {
+                tower.lastTargetLostTime = timestamp;
+                tower.lockedTarget = null;
+                tower.isCharging = false;
+            }
+
+            // Try to find new target if we don't have one
+            if (targetInvalid && !tower.lockedTarget) {
+                // ALWAYS check cooldown - must wait 3 seconds after losing any target
+                const cooldownPassed = !tower.lastTargetLostTime ||
+                    timestamp - tower.lastTargetLostTime >= tower.type.targetCooldown;
+
+                if (cooldownPassed) {
+                    // Find new target
+                    const newTarget = findTarget(tower);
+                    if (newTarget) {
+                        tower.lockedTarget = newTarget;
+                        tower.chargeStartTime = timestamp;
+                        tower.isCharging = true;
+                    }
+                }
+            }
+
+            // Attack locked target
+            if (tower.lockedTarget && isInRange(tower, tower.lockedTarget) && timestamp - tower.lastFired >= buffedFireRate) {
+                if (!tower.lockedTarget.isSummon) {
+                    let damage;
+
+                    // Calculate damage based on level
+                    if (stats.chargeMaxMin && stats.chargeMaxMax) {
+                        // Levels 4-5: Charge mechanic
+                        const chargeTime = timestamp - tower.chargeStartTime;
+                        const chargeTicks = Math.floor(chargeTime / stats.chargeInterval);
+                        const chargeBonus = chargeTicks * stats.chargeRate;
+
+                        // Base random damage
+                        const baseDamage = Math.floor(Math.random() * (stats.damageMax - stats.damageMin + 1)) + stats.damageMin;
+                        const chargedDamage = baseDamage + chargeBonus;
+
+                        // Cap at max charge damage (also random)
+                        const maxChargeDamage = Math.floor(Math.random() * (stats.chargeMaxMax - stats.chargeMaxMin + 1)) + stats.chargeMaxMin;
+                        damage = Math.min(chargedDamage, maxChargeDamage);
+                    } else {
+                        // Levels 1-3: Simple random damage
+                        damage = Math.floor(Math.random() * (stats.damageMax - stats.damageMin + 1)) + stats.damageMin;
+                    }
+
+                    applyDamage(tower.lockedTarget, damage, 'laser');
+                    tower.isFiring = true;
+
+                    // Track last damage dealt for DPS calculation
+                    tower.lastDamageDealt = damage;
+                    tower.lastDamageTime = timestamp;
+                }
+                tower.lastFired = timestamp;
+            } else if (!tower.lockedTarget) {
+                tower.isFiring = false;
+            }
+        }
+        // --- End Charger Tower Logic ---
+
         // --- Attacker Tower Logic ---
         else if (!tower.type.farm && !tower.type.support && stats.damage && stats.fireRate) {
             // Get Commander buffs (unless tower cannot be buffed)
@@ -2391,12 +3159,12 @@ function updateTowers(timestamp) {
                     });
                 } else if (tower.type.name === 'Raygunner') {
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage);
+                        applyDamage(tower.target, buffedDamage, 'laser');
                         tower.isFiring = true;
                     }
                 } else if (tower.type.name === 'Railgunner') {
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage);
+                        applyDamage(tower.target, buffedDamage, 'piercing');
                         railgunShots.push({
                             x1: tower.x,
                             y1: tower.y,
@@ -2410,7 +3178,7 @@ function updateTowers(timestamp) {
                 } else if (tower.type === TOWER_TYPES.SNIPER_PARAGON) {
                     // Sniper Paragon shoots like sniper with explosion delay at Radian 3
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage);
+                        applyDamage(tower.target, buffedDamage, 'piercing');
                         railgunShots.push({
                             x1: tower.x,
                             y1: tower.y,
@@ -2440,7 +3208,7 @@ function updateTowers(timestamp) {
                                     if (!enemy.isSummon) {
                                         const dist = calculateDistance(targetX, targetY, enemy.x, enemy.y);
                                         if (dist <= GRID_SIZE * 3) {
-                                            applyDamage(enemy, stats.explosionDamage);
+                                            applyDamage(enemy, stats.explosionDamage, 'explosive');
                                         }
                                     }
                                 });
@@ -2469,19 +3237,23 @@ function updateTowers(timestamp) {
 
 
 // Apply damage with resistance calculation
-function applyDamage(enemy, damage, damageType = 'normal') {
+// Damage types: 'bullet', 'laser', 'piercing', 'explosive', 'normal'
+// Piercing damage bypasses global resistance
+function applyDamage(enemy, damage, damageType = 'bullet') {
     let finalDamage = damage;
 
-    // Apply resistances if enemy has them
-    if (enemy.resistance) {
-        // Apply global resistance first
-        if (enemy.resistance.global) {
-            finalDamage *= (1 - enemy.resistance.global);
+    // Check for resistances (support both enemy.type.resistances and legacy enemy.resistance)
+    const resistances = enemy.type?.resistances || enemy.resistance;
+
+    if (resistances) {
+        // Apply global resistance first (UNLESS piercing damage, which bypasses global)
+        if (resistances.global && damageType !== 'piercing') {
+            finalDamage *= (1 - resistances.global);
         }
 
-        // Apply specific damage type resistance
-        if (damageType === 'explosive' && enemy.resistance.explosive) {
-            finalDamage *= (1 - enemy.resistance.explosive);
+        // Apply specific damage type resistance (supports negative = amplification)
+        if (resistances[damageType] !== undefined) {
+            finalDamage *= (1 - resistances[damageType]);
         }
     }
 
@@ -2500,6 +3272,22 @@ function applyDamage(enemy, damage, damageType = 'normal') {
     // Apply remaining damage to HP
     enemy.hp -= remainingDamage;
 
+    // Award tiered percentage of damage dealt as cash (only for non-summon enemies)
+    if (!enemy.isSummon && finalDamage > 0) {
+        let cashPercentage = 0.10;
+        if (finalDamage > 50000) {
+            cashPercentage = 0.01;
+        } else if (finalDamage > 10000) {
+            cashPercentage = 0.03;
+        } else if (finalDamage > 2000) {
+            cashPercentage = 0.05;
+        }
+        const cashOnHit = Math.floor(finalDamage * cashPercentage);
+        if (cashOnHit > 0) {
+            cash += cashOnHit;
+        }
+    }
+
     return finalDamage;
 }
 
@@ -2509,13 +3297,16 @@ function findTarget(tower) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
+    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
 
     let furthestEnemy = null;
     let maxDistanceTraveled = -Infinity;
     for (const enemy of enemies) {
         if (enemy.hp > 0 && !enemy.isSummon) {
-            const distance = calculateDistance(tower.x, tower.y, enemy.x, enemy.y);
-            if (distance <= buffedRange * GRID_SIZE && enemy.distanceTraveled > maxDistanceTraveled) {
+            const dx = tower.x - enemy.x;
+            const dy = tower.y - enemy.y;
+            const sqDist = dx * dx + dy * dy;
+            if (sqDist <= sqRange && enemy.distanceTraveled > maxDistanceTraveled) {
                 furthestEnemy = enemy;
                 maxDistanceTraveled = enemy.distanceTraveled;
             }
@@ -2530,12 +3321,33 @@ function isInRange(tower, target) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    return calculateDistance(tower.x, tower.y, target.x, target.y) <= buffedRange * GRID_SIZE;
+    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
+
+    const dx = tower.x - target.x;
+    const dy = tower.y - target.y;
+    return (dx * dx + dy * dy) <= sqRange;
 }
 
 // Calculate distance
 function calculateDistance(x1, y1, x2, y2) {
-    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Convert hex color to rgba with alpha
+function hexToRgba(hex, alpha) {
+    // Handle hex with or without # and with optional alpha (8 char hex)
+    hex = hex.replace('#', '');
+
+    // Take only RGB portion (first 6 chars) if hex is longer (like #ffffffff)
+    if (hex.length > 6) hex = hex.substring(0, 6);
+
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // Draw towers
@@ -2549,6 +3361,8 @@ function drawTowers() {
             towerSizeX = 2; towerSizeY = 2; // 2x2 towers
         } else if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
             towerSizeX = 3; towerSizeY = 3; // 3x3 tower
+        } else if (tower.type === TOWER_TYPES.CARRIER_CUBE) {
+            towerSizeX = 4; towerSizeY = 4; // 4x4 tower
         }
 
         // Draw the tower's main body
@@ -2588,6 +3402,7 @@ function updateWave(timestamp) {
             const currentGroup = wave.data.groups[wave.groupIndex];
 
             if (wave.waitTimer >= currentGroup.waitAfter) {
+                console.log(`Group ${wave.groupIndex} wait finished. Moving to next group.`);
                 wave.isWaiting = false;
                 wave.groupIndex++;
 
@@ -2608,6 +3423,7 @@ function updateWave(timestamp) {
             } else {
                 // Group finished
                 if (wave.groupIndex < wave.data.groups.length) {
+                    console.log(`Group ${wave.groupIndex} finished. Waiting ${wave.data.groups[wave.groupIndex].waitAfter}ms`);
                     wave.isWaiting = true;
                     wave.waitTimer = 0;
                 }
@@ -2699,10 +3515,136 @@ function updateEnemies(timestamp) {
         }
         // END OF REPLACED BLOCK
         else {
+            // ═══════════════════════════════════════════════════════════════
+            // NIGHTMARE MODE MECHANICS
+            // ═══════════════════════════════════════════════════════════════
+
+            // --- SUMMONER ENEMIES ---
+            // Enemies with isSummoner flag spawn minions on a cooldown
+            if (entity.type.isSummoner && !entity.isSummon) {
+                if (!entity.lastSummonTime) entity.lastSummonTime = timestamp;
+
+                if (timestamp - entity.lastSummonTime >= (entity.type.summoncooldown || 10000)) {
+                    const summonTypeName = entity.type.summonType;
+                    const summonType = ENEMY_TYPES[summonTypeName];
+                    if (summonType) {
+                        const summonCount = entity.type.summoncount || 1;
+                        for (let j = 0; j < summonCount; j++) {
+                            // Spawn summons at the summoner's current position along the path
+                            const newEnemy = {
+                                type: summonType,
+                                x: entity.x,
+                                y: entity.y,
+                                hp: summonType.baseHp,
+                                maxHp: summonType.baseHp,
+                                shield: summonType.hasShield ? summonType.shieldHp : 0,
+                                maxShield: summonType.hasShield ? summonType.shieldHp : 0,
+                                speed: summonType.speed,
+                                distanceTraveled: entity.distanceTraveled, // Same progress as summoner
+                                size: summonType.size,
+                                isSummoned: true
+                            };
+                            enemies.push(newEnemy);
+                        }
+                        console.log(`${entity.type.name} summoned ${summonCount} ${summonTypeName}!`);
+                    }
+                    entity.lastSummonTime = timestamp;
+                }
+            }
+
+            // --- QUANTUM PHASE (Silver Cube) ---
+            // At phaseTwoHp, heals fully + bonus HP and doubles speed (once only)
+            if (entity.type.isQuantum && !entity.quantumTriggered) {
+                if (entity.hp <= entity.type.phaseTwoHp) {
+                    entity.quantumTriggered = true;
+                    const newMaxHp = entity.maxHp + (entity.type.phaseTwoBonusHp || 0);
+                    entity.hp = newMaxHp;
+                    entity.maxHp = newMaxHp;
+                    entity.speed = entity.type.speed * (entity.type.phaseTwoSpeedMultiplier || 2);
+                    // Visual flash effect
+                    explosions.push({
+                        x: entity.x,
+                        y: entity.y,
+                        size: 0,
+                        maxSize: entity.type.size * 3,
+                        startTime: timestamp,
+                        duration: 300
+                    });
+                    console.log(`${entity.type.name} entered Quantum Phase! HP: ${entity.hp}, Speed: ${entity.speed}`);
+                }
+            }
+
+            // --- OMEGA BOSS SHIELD REGENERATION ---
+            // Omega Cube regens 1M shield every 60 seconds
+            if (entity.type.name === 'THE OMEGA CUBE' && entity.type.hasShield) {
+                if (!entity.lastShieldRegen) entity.lastShieldRegen = timestamp;
+
+                if (timestamp - entity.lastShieldRegen >= 60000) {
+                    const regenAmount = 1000000;
+                    entity.shield = Math.min(entity.maxShield, entity.shield + regenAmount);
+                    entity.lastShieldRegen = timestamp;
+                    console.log(`Omega Cube regenerated ${regenAmount} shield! Current: ${entity.shield}`);
+                }
+            }
+
+            // --- SHIELDER SUPPORT (Shielder Cube) ---
+            // Grants shield to nearby enemies every 10 seconds
+            if (entity.type.isSupport && !entity.isSummon) {
+                // Initialize to (timestamp - 10000) so first shield happens immediately
+                if (entity.lastShieldTime === undefined) {
+                    entity.lastShieldTime = timestamp - 10000;
+                    console.log(`Shielder initialized, lastShieldTime set to trigger immediately`);
+                }
+
+                if (timestamp - entity.lastShieldTime >= 10000) { // Every 10 seconds
+                    const shieldRange = 3 * GRID_SIZE; // 3 grid range
+                    let shieldedCount = 0;
+
+                    enemies.forEach(target => {
+                        // Skip self and other shielders
+                        if (target === entity) return;
+                        if (target.type.isSupport) return;
+                        if (target.isSummon) return; // Don't shield our own summons
+
+                        const distance = calculateDistance(entity.x, entity.y, target.x, target.y);
+                        console.log(`Checking ${target.type.name} - distance: ${distance}, range: ${shieldRange}`);
+
+                        if (distance <= shieldRange) {
+                            // Grant 10% of target's base HP as shield
+                            const shieldAmount = Math.floor(target.type.baseHp * 0.10);
+
+                            // Initialize shield if enemy doesn't have one
+                            if (!target.shield) target.shield = 0;
+                            if (!target.maxShield) target.maxShield = 0;
+
+                            // Add shield (stacks with existing shield)
+                            target.shield += shieldAmount;
+                            target.maxShield = Math.max(target.maxShield, target.shield);
+
+                            // Mark as having shield for visual effect
+                            target.hasShield = true;
+                            shieldedCount++;
+                            console.log(`Granted ${shieldAmount} shield to ${target.type.name}! Total shield: ${target.shield}`);
+                        }
+                    });
+
+                    entity.lastShieldTime = timestamp;
+                    console.log(`Shielder Cube granted shields to ${shieldedCount} nearby enemies!`);
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // END NIGHTMARE MODE MECHANICS
+            // ═══════════════════════════════════════════════════════════════
+
+
             moveEntity(entity, false);
             if (entity.distanceTraveled >= getPathLength()) {
-                damageBase(entity);
-                enemies.splice(i, 1);
+                // damageBase returns true if the enemy should be removed, false if it looped
+                const shouldRemove = damageBase(entity);
+                if (shouldRemove !== false) {
+                    enemies.splice(i, 1);
+                }
             }
         }
     }
@@ -3216,6 +4158,42 @@ function drawEntities() {
         const size = entity.type.size;
         ctx.fillRect(entity.x - size / 2, entity.y - size / 2, size, size);
 
+        // ═══════════════════════════════════════════════════════════════
+        // SHIELD BUBBLE VISUAL
+        // If enemy has shield, draw a transparent glass-like bubble around them
+        // ═══════════════════════════════════════════════════════════════
+        if ((entity.hasShield || entity.type.hasShield) && entity.shield > 0) {
+            // Parse the entity's color to create a lighter, transparent version
+            const baseColor = entity.type.color;
+            const bubbleSize = size * 1.4; // Slightly larger than the entity
+
+            // Create gradient for glass-like effect
+            const gradient = ctx.createRadialGradient(
+                entity.x, entity.y, size * 0.3,
+                entity.x, entity.y, bubbleSize * 0.6
+            );
+
+            // Use the entity's color with varying transparency for glass effect
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)'); // Light center
+            gradient.addColorStop(0.4, hexToRgba(baseColor, 0.15)); // Color fade
+            gradient.addColorStop(0.7, hexToRgba(baseColor, 0.25)); // More color
+            gradient.addColorStop(1, hexToRgba(baseColor, 0.4)); // Edge color
+
+            // Draw the bubble (circle around the cube)
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y, bubbleSize * 0.55, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Add a subtle outline
+            ctx.strokeStyle = hexToRgba(baseColor, 0.5);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        // ═══════════════════════════════════════════════════════════════
+        // END SHIELD BUBBLE VISUAL
+        // ═══════════════════════════════════════════════════════════════
+
         // Show HP bar on hover for normal enemies (not bosses with showHpBar)
         if (hoveredEnemy === entity && !entity.type.showHpBar) {
             const barWidth = size * 2.5; // Bigger bar
@@ -3304,7 +4282,7 @@ function drawEntities() {
 
             ctx.font = hpBarCollapsed ? '12px Arial' : '16px Arial';
             let hpText = entity.type.hasShield ?
-                `HP: ${Math.floor(entity.hp).toLocaleString()} / ${entity.maxHp.toLocaleString()} | Shield: ${Math.floor(entity.shield).toLocaleString()}` :
+                `HP: ${Math.floor(entity.hp).toLocaleString()} | Shield: ${Math.floor(entity.shield).toLocaleString()}` :
                 `HP: ${Math.floor(entity.hp).toLocaleString()} / ${entity.maxHp.toLocaleString()}`;
 
             // Show DPS for test dummy
@@ -3385,21 +4363,83 @@ function drawEntities() {
 
 // Damage base
 function damageBase(enemy) {
-    if (invincible) return; // Invincibility cheat
+    if (invincible || isGameOver) return; // Invincibility cheat or already game over
+
+    // ═══════════════════════════════════════════════════════════════
+    // OMEGA BOSS LOOP SYSTEM
+    // Instead of damaging base, Omega loops back to start
+    // ═══════════════════════════════════════════════════════════════
+    if (enemy.type.loopcount) {
+        // Initialize loop tracking if not set
+        if (typeof enemy.loopsRemaining === 'undefined') {
+            // Use insaneLoopcount for Straight Line map, otherwise normal loopcount
+            const isStraightLine = currentMap === MAP_TYPES.STRAIGHT;
+            enemy.loopsRemaining = isStraightLine ?
+                (enemy.type.insaneLoopcount || 3) :
+                (enemy.type.loopcount || 2);
+            console.log(`Omega Boss initialized with ${enemy.loopsRemaining} loops (${isStraightLine ? 'Straight Line' : 'Standard'} map)`);
+        }
+
+        if (enemy.loopsRemaining > 0) {
+            enemy.loopsRemaining--;
+            console.log(`Omega Boss looped! Loops remaining: ${enemy.loopsRemaining}`);
+
+            // Reset to start of path
+            enemy.distanceTraveled = 0;
+            enemy.x = path[0].x;
+            enemy.y = path[0].y;
+
+            // Spawn 2 Omega Summons on each loop
+            const omegaSummonType = ENEMY_TYPES.omegasummon_nm;
+            if (omegaSummonType) {
+                for (let j = 0; j < 2; j++) {
+                    const newEnemy = {
+                        type: omegaSummonType,
+                        x: enemy.x + (j * 30), // Slight offset
+                        y: enemy.y,
+                        hp: omegaSummonType.baseHp,
+                        maxHp: omegaSummonType.baseHp,
+                        shield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
+                        maxShield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
+                        speed: omegaSummonType.speed,
+                        distanceTraveled: 0,
+                        size: omegaSummonType.size,
+                        isSummoned: true
+                    };
+                    enemies.push(newEnemy);
+                }
+                console.log(`Omega Boss spawned 2 Omega Summons!`);
+            }
+
+            // Don't damage base - return false so enemy is NOT removed from array
+            return false;
+        }
+        // If no loops remaining, proceed to damage base normally
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // END OMEGA BOSS LOOP SYSTEM
+    // ═══════════════════════════════════════════════════════════════
+
     const damage = Math.max(1, Math.floor(enemy.type.baseHp / 2));
     baseHp -= damage;
-    if (baseHp <= 0) gameOver();
+    if (baseHp <= 0 && !isGameOver) gameOver();
     baseHpDisplay.textContent = Math.max(0, baseHp);
 }
 
 // Game over
 function gameOver() {
+    if (isGameOver) return; // Prevent multiple triggers
+    isGameOver = true;
+
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
 
-    alert('Game Over! Your base was destroyed.');
-    showMainMenu();
+    // Clear carrier units
+    if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
+
+    // Show styled game over modal
+    showGameEndModal('💀 GAME OVER', 'Your base was destroyed!', '#FF4444', '#880000');
 }
 
 // Game won
@@ -3408,8 +4448,80 @@ function gameWon() {
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
 
-    alert(`Congratulations! You've completed the ${currentGameMode.name} mode!`);
-    showMainMenu();
+    // Clear carrier units
+    if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
+
+    // Show styled victory modal
+    showGameEndModal('🏆 VICTORY!', `You've completed ${currentGameMode.name} mode!`, '#00FF88', '#006633');
+}
+
+// Show game end modal
+function showGameEndModal(title, message, primaryColor, backgroundColor) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'gameEndOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        animation: fadeIn 0.3s ease;
+    `;
+
+    // Create modal content
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        background: linear-gradient(135deg, ${backgroundColor}, #1a1a2e);
+        border: 3px solid ${primaryColor};
+        border-radius: 20px;
+        padding: 40px 60px;
+        text-align: center;
+        box-shadow: 0 0 50px ${primaryColor}66, 0 0 100px ${primaryColor}33;
+        animation: scaleIn 0.4s ease;
+    `;
+
+    modal.innerHTML = `
+        <h1 style="color: ${primaryColor}; font-size: 48px; margin: 0 0 20px 0; text-shadow: 0 0 20px ${primaryColor}88;">${title}</h1>
+        <p style="color: #fff; font-size: 20px; margin: 0 0 30px 0; opacity: 0.9;">${message}</p>
+        <p style="color: #aaa; font-size: 14px; margin: 0 0 30px 0;">Wave Reached: ${waveNumber}</p>
+        <button id="gameEndBtn" style="
+            background: linear-gradient(135deg, ${primaryColor}, ${backgroundColor});
+            border: 2px solid ${primaryColor};
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 15px 50px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px ${primaryColor}44;
+        ">Return to Menu</button>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Add animation styles
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        #gameEndBtn:hover { transform: translateY(-3px); box-shadow: 0 8px 30px ${primaryColor}66; }
+    `;
+    document.head.appendChild(style);
+
+    // Button click handler
+    document.getElementById('gameEndBtn').addEventListener('click', () => {
+        overlay.remove();
+        style.remove();
+        showMainMenu();
+    });
 }
 
 // Reset game
@@ -3428,7 +4540,15 @@ function resetGame(newGame = false) {
     betaProtocolTimeouts = [];
 
     // Reset all game state variables
-    cash = 250 * (newGame ? currentGameMode.cashMultiplier : 1);
+    if (currentGameMode.name === "Boss Rush" && newGame) {
+        console.log("Initializing Boss Rush mode with 1,000,000 cash");
+        cash = 1000000;
+    } else if (currentGameMode.startingCash && newGame) {
+        console.log(`Initializing ${currentGameMode.name} mode with ${currentGameMode.startingCash} cash`);
+        cash = currentGameMode.startingCash;
+    } else {
+        cash = 250 * (newGame ? currentGameMode.cashMultiplier : 1);
+    }
     waveNumber = 0;
     baseHp = BASE_HP;
     towers = [];
@@ -3455,6 +4575,10 @@ function resetGame(newGame = false) {
     currentInfoTower = null;
     orbitalStrikeActive = false;
     orbitalStrikeData = null;
+    isGameOver = false; // Reset game over flag
+
+    // Clear all Carrier Cube units
+    if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
 
     // Update UI
     updateCashDisplay();
@@ -3466,6 +4590,7 @@ function resetGame(newGame = false) {
 
     // Hide any tower info panel
     towerInfoPanel.style.display = 'none';
+    document.getElementById('carrierSpawnPanel').style.display = 'none';
     currentInfoTower = null;
 
     // Recreate the grid and path
@@ -3487,6 +4612,9 @@ function updateCashEffects(timestamp) {
 
 // Check wave complete
 function checkWaveComplete() {
+    // Don't check for wave completion if game is already over
+    if (isGameOver) return;
+
     const allWavesDone = activeWaves.length === 0;
     const noEnemiesLeft = enemies.filter(e => !e.isSummon).length === 0;
 
@@ -3520,6 +4648,218 @@ function checkWaveComplete() {
 
 
 
+
+// Update Carrier Cube Towers (Efficiency Module & Per-Unit Cooldowns)
+function updateCarrierCubes(timestamp) {
+    towers.forEach(tower => {
+        if (tower.type !== TOWER_TYPES.CARRIER_CUBE) return;
+
+        // Initialize state if needed
+        if (typeof tower.em === 'undefined') tower.em = 0;
+        if (!tower.lastEmUpdate) tower.lastEmUpdate = timestamp;
+        if (!tower.unitState) tower.unitState = {};
+
+        // Efficiency Module Generation (level-based: L1 = 1/s, L2 = 2/s)
+        const levelStats = tower.type.levels[tower.level - 1];
+        const emGain = levelStats.emGainPerSec || 1;
+        const emCap = levelStats.emCap || tower.type.efficiencyCap || 20;
+
+        if (timestamp - tower.lastEmUpdate >= 1000) {
+            if (tower.em < emCap) {
+                tower.em = Math.min(tower.em + emGain, emCap);
+                // Update UI if this tower is selected
+                if (currentInfoTower === tower) {
+                    showTowerInfo(tower);
+                    showCarrierSpawnUI(tower);
+                }
+            }
+            tower.lastEmUpdate = timestamp;
+        }
+
+        // Per-Unit Cooldown Management
+        const allUnits = [CARRIER_UNITS.BOMBER, CARRIER_UNITS.BLISMA, CARRIER_UNITS.REFRACTOR, CARRIER_UNITS.MOAB, CARRIER_UNITS.GOLIATH];
+        let stateChanged = false;
+
+        allUnits.forEach(unitType => {
+            if (!tower.unitState[unitType.name]) return;
+
+            const unitState = tower.unitState[unitType.name];
+            const currentTime = performance.now();
+
+            // Check if cooldown has expired
+            if (unitState.cooldownEndTime > 0 && currentTime >= unitState.cooldownEndTime) {
+                // State transitions on cooldown expiry
+                if (unitState.cooldownState === 'COOLDOWN') {
+                    unitState.cooldownState = 'READY';
+                    unitState.usageCount = 0;
+                    stateChanged = true;
+                } else if (unitState.cooldownState === 'FULL_COOLDOWN') {
+                    unitState.cooldownState = 'READY';
+                    unitState.usageCount = 0;
+                    stateChanged = true;
+                } else if (unitState.cooldownState === 'PAYBACK') {
+                    unitState.cooldownState = 'READY';
+                    unitState.usageCount = 0;
+                    stateChanged = true;
+                }
+                unitState.cooldownEndTime = 0;
+            }
+        });
+
+        // Update UI if state changed and this tower is selected
+        if (stateChanged && currentInfoTower === tower) {
+            showTowerInfo(tower);
+            showCarrierSpawnUI(tower);
+        }
+    });
+}
+
+// Trigger Carrier Ability
+function triggerCarrierAbility(tower, unitType) {
+    // Initialize per-unit state tracking
+    if (!tower.unitState) tower.unitState = {};
+    if (!tower.unitState[unitType.name]) {
+        tower.unitState[unitType.name] = {
+            cooldownState: 'READY',
+            usageCount: 0,
+            cooldownEndTime: 0
+        };
+    }
+
+    const unitState = tower.unitState[unitType.name];
+    const currentTime = performance.now();
+
+    // Check if unit is in payback (locked)
+    if (unitState.cooldownState === 'PAYBACK' && currentTime < unitState.cooldownEndTime) {
+        return; // Locked
+    }
+
+    // Check if on individual cooldown
+    if (unitState.cooldownState === 'COOLDOWN' && currentTime < unitState.cooldownEndTime) {
+        // Can still use during cooldown, but increments usage
+    }
+
+    // Check if not enough EM
+    if ((tower.em || 0) < unitType.emCost) return;
+
+    // Check hard limit - if exceeded during full cooldown, trigger payback
+    if (unitState.cooldownState === 'FULL_COOLDOWN' && currentTime < unitState.cooldownEndTime) {
+        if (unitState.usageCount >= (unitType.hardLimit || 3)) {
+            unitState.cooldownState = 'PAYBACK';
+            unitState.cooldownEndTime = currentTime + (unitType.paybackCooldown || 20000);
+            console.log(`${unitType.name} Payback Cooldown Triggered!`);
+            showTowerInfo(tower);
+            showCarrierSpawnUI(tower);
+            return;
+        }
+    }
+
+    // Deduct EM
+    tower.em -= unitType.emCost;
+
+    // Initialize per-unit cooldowns if not exists
+    if (!tower.unitCooldowns) tower.unitCooldowns = {};
+
+    // Set cooldown for THIS unit (for UI display)
+    tower.unitCooldowns[unitType.name] = currentTime + unitType.cooldown;
+
+    // Spawn Unit
+    if (unitType === CARRIER_UNITS.BOMBER) {
+        // Enter targeting mode
+        enterCarrierTargetingMode(tower, unitType);
+        return;
+    }
+
+    // Other units spawn immediately
+    spawnCarrierUnit(unitType, tower);
+
+    // Update Cooldowns
+    handleCarrierCooldown(tower, unitType);
+
+    showTowerInfo(tower);
+    showCarrierSpawnUI(tower);
+}
+
+// Handle Carrier Cooldown Logic (per unit type)
+function handleCarrierCooldown(tower, unitType) {
+    if (!tower.unitState) tower.unitState = {};
+    if (!tower.unitState[unitType.name]) {
+        tower.unitState[unitType.name] = {
+            cooldownState: 'READY',
+            usageCount: 0,
+            cooldownEndTime: 0
+        };
+    }
+
+    const unitState = tower.unitState[unitType.name];
+    const currentTime = performance.now();
+    const limit = unitType.limit || 2;
+    const hardLimit = unitType.hardLimit || 3;
+
+    unitState.usageCount++;
+
+    if (unitState.cooldownState === 'READY' ||
+        (unitState.cooldownState === 'COOLDOWN' && currentTime >= unitState.cooldownEndTime)) {
+        unitState.cooldownState = 'COOLDOWN';
+        unitState.cooldownEndTime = currentTime + (unitType.cooldown || 5000);
+    }
+
+    // Check if we hit the limit -> trigger full cooldown
+    if (unitState.usageCount >= limit && unitState.cooldownState === 'COOLDOWN') {
+        unitState.cooldownState = 'FULL_COOLDOWN';
+        unitState.cooldownEndTime = currentTime + (unitType.fullCooldown || 15000);
+    }
+
+    // Check if we hit the hard limit during full cooldown -> trigger payback
+    if (unitState.usageCount >= hardLimit && unitState.cooldownState === 'FULL_COOLDOWN') {
+        unitState.cooldownState = 'PAYBACK';
+        unitState.cooldownEndTime = currentTime + (unitType.paybackCooldown || 20000);
+    }
+}
+
+// Carrier Targeting Mode
+let carrierTargetingMode = false;
+let carrierTargetingUnit = null;
+let carrierTargetingTower = null;
+
+function enterCarrierTargetingMode(tower, unitType) {
+    carrierTargetingMode = true;
+    carrierTargetingUnit = unitType;
+    carrierTargetingTower = tower;
+    canvas.style.cursor = 'crosshair';
+
+    // Add temporary click listener for targeting
+    const targetingHandler = (e) => {
+        if (!carrierTargetingMode) {
+            canvas.removeEventListener('click', targetingHandler);
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Spawn unit at target
+        spawnCarrierUnit(carrierTargetingUnit, carrierTargetingTower, mouseX, mouseY);
+
+        // Update Cooldowns
+        handleCarrierCooldown(carrierTargetingTower, carrierTargetingUnit);
+
+        // Exit targeting mode
+        carrierTargetingMode = false;
+        carrierTargetingUnit = null;
+        carrierTargetingTower = null;
+        canvas.style.cursor = 'default';
+        canvas.removeEventListener('click', targetingHandler);
+
+        showTowerInfo(tower);
+        showCarrierSpawnUI(tower);
+        e.stopPropagation(); // Prevent selecting other things
+    };
+
+    // Use capture to handle it before the main canvas click handler
+    canvas.addEventListener('click', targetingHandler, { capture: true, once: true });
+}
 
 // Start the game when DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
