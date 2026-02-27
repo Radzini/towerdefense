@@ -146,18 +146,13 @@ const MAP_TYPES = {
     STANDARD: {
         name: "Standard",
         createPath: function (gridWidth, gridHeight) {
-            const logicalW = 35;
-            const logicalH = 22;
-            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
-            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
-
             const pathPoints = [
-                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
-                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 4) },
-                { x: offsetX + Math.floor(logicalW / 2), y: offsetY + Math.floor(logicalH / 2) },
-                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
-                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
-                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
+                { x: 0, y: Math.floor(gridHeight / 4) },
+                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 4) },
+                { x: Math.floor(gridWidth / 2), y: Math.floor(gridHeight / 2) },
+                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
+                { x: Math.floor(gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
+                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -165,14 +160,9 @@ const MAP_TYPES = {
     STRAIGHT: {
         name: "Straight Line",
         createPath: function (gridWidth, gridHeight) {
-            const logicalW = 35;
-            const logicalH = 22;
-            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
-            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
-
             const pathPoints = [
-                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 2) },
-                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(logicalH / 2) }
+                { x: 0, y: Math.floor(gridHeight / 2) },
+                { x: gridWidth - 1, y: Math.floor(gridHeight / 2) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -180,18 +170,13 @@ const MAP_TYPES = {
     INTERSECTION: {
         name: "Intersection",
         createPath: function (gridWidth, gridHeight) {
-            const logicalW = 35;
-            const logicalH = 22;
-            const offsetX = Math.max(0, Math.floor((gridWidth - logicalW) / 2));
-            const offsetY = Math.max(0, Math.floor((gridHeight - logicalH) / 2));
-
             const pathPoints = [
-                { x: offsetX + 0, y: offsetY + Math.floor(logicalH / 4) },
-                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 4) },
-                { x: offsetX + Math.floor(logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
-                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(logicalH / 2) },
-                { x: offsetX + Math.floor(3 * logicalW / 4), y: offsetY + Math.floor(3 * logicalH / 4) },
-                { x: offsetX + logicalW - 1, y: offsetY + Math.floor(3 * logicalH / 4) }
+                { x: 0, y: Math.floor(gridHeight / 4) },
+                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 4) },
+                { x: Math.floor(gridWidth / 4), y: Math.floor(gridHeight / 2) },
+                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(gridHeight / 2) },
+                { x: Math.floor(3 * gridWidth / 4), y: Math.floor(3 * gridHeight / 4) },
+                { x: gridWidth - 1, y: Math.floor(3 * gridHeight / 4) }
             ];
             return generatePathFromPoints(pathPoints);
         }
@@ -280,9 +265,9 @@ function initGame() {
 
 // Resize canvas
 function resizeCanvas() {
-    // Set canvas size to fit the screen window
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // Set fixed canvas size for consistency across all devices
+    canvas.width = 1400;
+    canvas.height = 900;
 
     // Don't change game dimensions if game is active
     if (waveNumber > 0 || towers.length > 0) {
@@ -518,8 +503,8 @@ function setupEventListeners() {
         freeUpgradesBtn.textContent = freeUpgrades ? '🆓 Free: ON' : '🆓 Free Upgrades';
     });
     speedUpBtn.addEventListener('click', () => {
-        gameSpeed = gameSpeed >= 4 ? 1 : gameSpeed + 1;
-        speedUpBtn.textContent = `⚡ Speed x${gameSpeed}`;
+        gameSpeed = gameSpeed === 1 ? 2 : 1;
+        speedUpBtn.textContent = gameSpeed === 2 ? '⚡ Speed: x2' : '⚡ Speed x2';
     });
 
     const spawnDummyBtn = document.getElementById('spawnDummyBtn');
@@ -2557,7 +2542,7 @@ function generateFarmCash() {
             const effect = { x: tower.x, y: tower.y - 10, text: `+$${cashAmount}`, alpha: 1, time: 0 };
             cashEffects.push(effect);
             const div = document.createElement('div');
-            div.className = 'cash-effect';
+            div.className = 'cashEffect';
             div.style.left = `${tower.x}px`;
             div.style.top = `${tower.y - 10}px`;
             div.textContent = effect.text;
@@ -3272,17 +3257,9 @@ function applyDamage(enemy, damage, damageType = 'bullet') {
     // Apply remaining damage to HP
     enemy.hp -= remainingDamage;
 
-    // Award tiered percentage of damage dealt as cash (only for non-summon enemies)
+    // Award 5% of damage dealt as cash (only for non-summon enemies)
     if (!enemy.isSummon && finalDamage > 0) {
-        let cashPercentage = 0.10;
-        if (finalDamage > 50000) {
-            cashPercentage = 0.01;
-        } else if (finalDamage > 10000) {
-            cashPercentage = 0.03;
-        } else if (finalDamage > 2000) {
-            cashPercentage = 0.05;
-        }
-        const cashOnHit = Math.floor(finalDamage * cashPercentage);
+        const cashOnHit = Math.floor(finalDamage * 0.05);
         if (cashOnHit > 0) {
             cash += cashOnHit;
         }
@@ -3297,16 +3274,13 @@ function findTarget(tower) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
 
     let furthestEnemy = null;
     let maxDistanceTraveled = -Infinity;
     for (const enemy of enemies) {
         if (enemy.hp > 0 && !enemy.isSummon) {
-            const dx = tower.x - enemy.x;
-            const dy = tower.y - enemy.y;
-            const sqDist = dx * dx + dy * dy;
-            if (sqDist <= sqRange && enemy.distanceTraveled > maxDistanceTraveled) {
+            const distance = calculateDistance(tower.x, tower.y, enemy.x, enemy.y);
+            if (distance <= buffedRange * GRID_SIZE && enemy.distanceTraveled > maxDistanceTraveled) {
                 furthestEnemy = enemy;
                 maxDistanceTraveled = enemy.distanceTraveled;
             }
@@ -3321,18 +3295,12 @@ function isInRange(tower, target) {
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
     const rangeBonus = tower.type.rangeBonus || 0;
     const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
-
-    const dx = tower.x - target.x;
-    const dy = tower.y - target.y;
-    return (dx * dx + dy * dy) <= sqRange;
+    return calculateDistance(tower.x, tower.y, target.x, target.y) <= buffedRange * GRID_SIZE;
 }
 
 // Calculate distance
 function calculateDistance(x1, y1, x2, y2) {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    return Math.sqrt(dx * dx + dy * dy);
+    return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
 }
 
 // Convert hex color to rgba with alpha

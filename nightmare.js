@@ -382,7 +382,7 @@ function generateNightmareWaves() {
                 { enemies: { omega_cube_nm: 1 }, spawnInterval: 1000, waitAfter: 0 }
 
             ],
-            endWaitTime: 17600004
+            endWaitTime: 360000
         },
     );
 
