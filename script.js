@@ -32,6 +32,7 @@ const cheatModal = document.getElementById('cheatModal');
 const closeCheatModal = document.getElementById('closeCheatModal');
 const towerButtons = {
     gunner: document.getElementById('gunnerBtn'),
+    operator: document.getElementById('operatorBtn'),
     sniper: document.getElementById('sniperBtn'),
     rocketer: document.getElementById('rocketerBtn'),
     raygunner: document.getElementById('raygunnerBtn'),
@@ -45,6 +46,7 @@ const towerButtons = {
     charger: document.getElementById('chargerBtn'),
     carrierCube: document.getElementById('carrierCubeBtn')
 };
+let lastJPressTime = 0;
 
 // Cheat buttons
 const addMoneyBtn = document.getElementById('addMoneyBtn');
@@ -372,6 +374,7 @@ function getLinePoints(x0, y0, x1, y1) {
 function setupEventListeners() {
     // Tower selection
     towerButtons.gunner.addEventListener('click', () => selectTowerType(TOWER_TYPES.GUNNER));
+    towerButtons.operator.addEventListener('click', () => selectTowerType(TOWER_TYPES.Operator));
     towerButtons.sniper.addEventListener('click', () => selectTowerType(TOWER_TYPES.SNIPER));
     towerButtons.rocketer.addEventListener('click', () => selectTowerType(TOWER_TYPES.ROCKETER));
     towerButtons.raygunner.addEventListener('click', () => selectTowerType(TOWER_TYPES.RAYGUNNER));
@@ -589,7 +592,34 @@ function setupEventListeners() {
             return;
         }
 
-        // Number keys for tower selection
+        // E key to upgrade selected tower
+        if (e.key === 'e' || e.key === 'E') {
+            if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
+                upgradeTower(window.currentSelectedTower);
+            }
+            return;
+        }
+
+        // J key double-tap to sell (500ms window)
+        if (e.key === 'j' || e.key === 'J') {
+            const now = performance.now();
+            if (now - lastJPressTime < 500) {
+                if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
+                    sellTower(window.currentSelectedTower);
+                }
+                lastJPressTime = 0;
+            } else {
+                lastJPressTime = now;
+            }
+            return;
+        }
+
+        // Q key for Operator
+        if (e.key === 'q' || e.key === 'Q') {
+            selectTowerType(TOWER_TYPES.Operator);
+            return;
+        }
+
         // Number keys for tower selection
         if (e.key >= '1' && e.key <= '9') {
             const towerTypes = [
@@ -604,21 +634,14 @@ function setupEventListeners() {
                 TOWER_TYPES.COMMANDER
             ];
             selectTowerType(towerTypes[parseInt(e.key) - 1]);
-        } else if (e.key === '0') { // Hotkey for Executive
+        } else if (e.key === '0') {
             selectTowerType(TOWER_TYPES.EXECUTIVE);
-        } else if (e.key === 'c' || e.key === 'C') { // Hotkey for Cube Factory
+        } else if (e.key === 'c' || e.key === 'C') {
             selectTowerType(TOWER_TYPES.CUBE_FACTORY);
-        } else if (e.key === 'z' || e.key === 'Z') { // Hotkey for Charger
+        } else if (e.key === 'z' || e.key === 'Z') {
             selectTowerType(TOWER_TYPES.CHARGER);
-        } else if (e.key === 'x' || e.key === 'X') { // Hotkey for Carrier Cube
+        } else if (e.key === 'x' || e.key === 'X') {
             selectTowerType(TOWER_TYPES.CARRIER_CUBE);
-        }
-
-
-        // Escape to cancel selection
-        if (e.key === 'Escape') {
-            selectedTower = null;
-            updateTowerSelection();
         }
     });
 
@@ -901,6 +924,35 @@ function showTowerInfo(tower) {
             </div>
         `;
     } else if (type.summons && currentStats.summons) {
+        // --- Hybrid Tower Stat Block ---
+        if (type.isHybrid) {
+            const buffs = getCommanderBuffs(tower);
+            const buffedDamage = Math.floor(currentStats.damage * (1 + buffs.damageBoost));
+            const buffedRange = currentStats.range + buffs.rangeBoost;
+            const buffedFireRate = currentStats.fireRate * (1 - buffs.fireRateBoost);
+            const dpsValue = ((buffedDamage / buffedFireRate) * 1000).toFixed(1);
+
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Damage</div>
+                    <div class="info-value">${buffedDamage}${buffs.damageBoost > 0 ? ` (+${Math.floor(currentStats.damage * buffs.damageBoost)})` : ''}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Range</div>
+                    <div class="info-value">${buffedRange}${buffs.rangeBoost > 0 ? ` (+${buffs.rangeBoost})` : ''} tiles</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Fire Rate</div>
+                    <div class="info-value">${(buffedFireRate / 1000).toFixed(2)}s${buffs.fireRateBoost > 0 ? ` (-${(buffs.fireRateBoost * 100).toFixed(0)}%)` : ''}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label" style="color: #FF1744;">DPS</div>
+                    <div class="info-value" style="color: #FF1744;">${dpsValue}/s</div>
+                </div>
+                <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 6px 0;"></div>
+            `;
+        }
+
         infoHTML += `<div class="info-row" style="margin-bottom: 8px;"><div class="info-label" style="color: #00ff88; font-weight: bold;">📦 Summons:</div></div>`;
         currentStats.summons.forEach(summon => {
             const summonType = SUMMON_TYPES[summon.type];
@@ -1136,6 +1188,16 @@ function showTowerInfo(tower) {
         const buffedRange = currentStats.range + buffs.rangeBoost;
         const buffedFireRate = currentStats.fireRate * (1 - buffs.fireRateBoost);
 
+        let fireRateLabel = "Fire Rate";
+        let dpsValue = ((buffedDamage / buffedFireRate) * 1000).toFixed(1);
+
+        if (currentStats.burstcount) {
+            fireRateLabel = "Burst Cooldown";
+            const cycleTime = (currentStats.burstcount - 1) * currentStats.burstfirerate + buffedFireRate;
+            const totalBurstDamage = buffedDamage * currentStats.burstcount;
+            dpsValue = ((totalBurstDamage / cycleTime) * 1000).toFixed(1);
+        }
+
         infoHTML += `
             <div class="info-row">
                 <div class="info-label">Damage</div>
@@ -1146,12 +1208,12 @@ function showTowerInfo(tower) {
                 <div class="info-value">${buffedRange}${buffs.rangeBoost > 0 ? ` (+${buffs.rangeBoost})` : ''} tiles</div>
             </div>
             <div class="info-row">
-                <div class="info-label">Fire Rate</div>
+                <div class="info-label">${fireRateLabel}</div>
                 <div class="info-value">${(buffedFireRate / 1000).toFixed(2)}s${buffs.fireRateBoost > 0 ? ` (-${(buffs.fireRateBoost * 100).toFixed(0)}%)` : ''}</div>
             </div>
             <div class="info-row">
                 <div class="info-label">DPS</div>
-                <div class="info-value">${((buffedDamage / buffedFireRate) * 1000).toFixed(1)}/s</div>
+                <div class="info-value">${dpsValue}/s</div>
             </div>
         `;
 
@@ -1175,9 +1237,13 @@ function showTowerInfo(tower) {
         const nextStats = type.levels[level];
         if (type.summons) {
             infoHTML += `<div class="info-row"><div class="info-label">Next Level:</div></div>`;
-            nextStats.summons.forEach(summon => {
-                infoHTML += `<div class="info-row"><div class="info-value">${SUMMON_TYPES[summon.type].name}</div></div>`;
-            });
+            if (nextStats.summons) {
+                nextStats.summons.forEach(summon => {
+                    infoHTML += `<div class="info-row"><div class="info-value">${SUMMON_TYPES[summon.type].name}</div></div>`;
+                });
+            } else {
+                infoHTML += `<div class="info-row" style="margin-left: 8px;"><span>Improved stats (No new summons)</span></div>`;
+            }
         } else if (type.farm) {
             infoHTML += `
                 <div class="info-row">
@@ -2885,7 +2951,7 @@ function drawSelectedTowerRange() {
     } else if (selectedCell) { // Showing range of an already placed tower
         const hoveredTower = towers.find(t => t.gridX === selectedCell.x && t.gridY === selectedCell.y);
 
-        if (hoveredTower && !hoveredTower.type.farm && !hoveredTower.type.summons && !hoveredTower.type.support) {
+        if (hoveredTower && !hoveredTower.type.farm && (!hoveredTower.type.summons || hoveredTower.type.isHybrid) && !hoveredTower.type.support) {
             const stats = hoveredTower.type.levels[hoveredTower.level - 1];
             const buffs = (stats.cannotBeBuffed || hoveredTower.type.cannotBeBuffed) ? { rangeBoost: 0 } : getCommanderBuffs(hoveredTower);
             const rangeBonus = hoveredTower.type.rangeBonus || 0;
@@ -3007,7 +3073,7 @@ function updateTowers(timestamp) {
         if (!tower.type || !tower.type.levels || tower.level < 1 || tower.level > tower.type.levels.length) continue;
         const stats = tower.type.levels[tower.level - 1];
 
-        // --- Summoner Logic ---
+        // --- Summoner Logic (runs for all towers with summons, including hybrids) ---
         if (tower.type.summons && stats.summons) {
             stats.summons.forEach(summon => {
                 const lastSummonTime = tower.lastSummonTimes[summon.type] || 0;
@@ -3041,9 +3107,15 @@ function updateTowers(timestamp) {
                         console.log(`[DEBUG CF] Global cooldown reset. Next spawn in ${tower.type.globalSpawnCooldown}ms`);
                     }
                 } else {
-                    // --- Normal Summoner Towers (Elite Spawner, Summoner) ---
+                    // --- Normal Summoner Towers (Elite Spawner, Summoner, Executive hybrid) ---
                     if (timestamp - lastSummonTime >= summon.spawnRate) {
-                        spawnEntity(SUMMON_TYPES[summon.type], tower.x, tower.y, true);
+                        const spawnCount = summon.count || 1;
+                        for (let sc = 0; sc < spawnCount; sc++) {
+                            // Add 200ms delay between multiple spawns so they don't stack perfectly
+                            setTimeout(() => {
+                                spawnEntity(SUMMON_TYPES[summon.type], tower.x, tower.y, true);
+                            }, sc * 200);
+                        }
                         tower.lastSummonTimes[summon.type] = timestamp;
                     }
                 }
@@ -3052,7 +3124,7 @@ function updateTowers(timestamp) {
         // --- End Summoner Logic ---
 
         // --- Charger Tower Logic ---
-        else if (tower.type.isCharger && stats.damageMin && stats.damageMax) {
+        if (tower.type.isCharger && stats.damageMin && stats.damageMax) {
             // Charger cannot be buffed at levels 4-5
             const buffs = (stats.cannotBeBuffed || tower.type.cannotBeBuffed) ?
                 { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
@@ -3133,8 +3205,8 @@ function updateTowers(timestamp) {
         }
         // --- End Charger Tower Logic ---
 
-        // --- Attacker Tower Logic ---
-        else if (!tower.type.farm && !tower.type.support && stats.damage && stats.fireRate) {
+        // --- Attacker Tower Logic (also runs for hybrid towers like Executive) ---
+        else if ((!tower.type.summons || tower.type.isHybrid) && !tower.type.farm && !tower.type.support && stats.damage && stats.fireRate) {
             // Get Commander buffs (unless tower cannot be buffed)
             const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
             const rangeBonus = tower.type.rangeBonus || 0;
@@ -3149,7 +3221,38 @@ function updateTowers(timestamp) {
             if (!tower.target || tower.target.hp <= 0 || !enemies.includes(tower.target) || !isInRange(tower, tower.target)) {
                 tower.target = findTarget(tower);
             }
-            if (tower.target && isInRange(tower, tower.target) && timestamp - tower.lastFired >= buffedFireRate) {
+
+            // --- Burst-fire logic (Operator tower) ---
+            if (stats.burstcount && tower.target && isInRange(tower, tower.target)) {
+                // Initialize burst state
+                if (!tower.burstRemaining) tower.burstRemaining = 0;
+                if (!tower.lastBurstShot) tower.lastBurstShot = 0;
+
+                // Start new burst cycle when cooldown is done and no burst active
+                if (tower.burstRemaining <= 0 && timestamp - tower.lastFired >= buffedFireRate) {
+                    tower.burstRemaining = stats.burstcount;
+                }
+
+                // Fire burst shots
+                if (tower.burstRemaining > 0 && timestamp - tower.lastBurstShot >= stats.burstfirerate) {
+                    if (!tower.target.isSummon && tower.target.hp > 0) {
+                        applyDamage(tower.target, buffedDamage);
+                        projectiles.push({
+                            x1: tower.x, y1: tower.y,
+                            x2: tower.target.x, y2: tower.target.y,
+                            color: tower.type.color, width: 2,
+                            startTime: timestamp, duration: 80
+                        });
+                    }
+                    tower.lastBurstShot = timestamp;
+                    tower.burstRemaining--;
+                    if (tower.burstRemaining <= 0) {
+                        tower.lastFired = timestamp;
+                    }
+                }
+            }
+            // --- Normal fire logic ---
+            else if (tower.target && isInRange(tower, tower.target) && timestamp - tower.lastFired >= buffedFireRate) {
                 if (tower.type.aoe) {
                     const directHit = tower.target;
                     enemies.forEach(enemy => {
@@ -3157,6 +3260,16 @@ function updateTowers(timestamp) {
                             const damage = enemy === directHit ? buffedDirectDamage : buffedDamage;
                             applyDamage(enemy, damage, 'explosive');
                         }
+                    });
+                    projectiles.push({
+                        x1: tower.x,
+                        y1: tower.y,
+                        x2: directHit.x,
+                        y2: directHit.y,
+                        color: tower.type.color,
+                        width: 3,
+                        startTime: timestamp,
+                        duration: 180
                     });
                     explosions.push({
                         x: tower.target.x,
@@ -3227,12 +3340,16 @@ function updateTowers(timestamp) {
                 } else {
                     if (!tower.target.isSummon) {
                         applyDamage(tower.target, buffedDamage);
-                        ctx.strokeStyle = tower.type.color;
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(tower.x, tower.y);
-                        ctx.lineTo(tower.target.x, tower.target.y);
-                        ctx.stroke();
+                        projectiles.push({
+                            x1: tower.x,
+                            y1: tower.y,
+                            x2: tower.target.x,
+                            y2: tower.target.y,
+                            color: tower.type.color,
+                            width: 3,
+                            startTime: timestamp,
+                            duration: 180
+                        });
                     }
                 }
                 tower.lastFired = timestamp;
@@ -3490,16 +3607,18 @@ function updateEnemies(timestamp) {
 
         // START OF REPLACED BLOCK
         if (entity.isSummon) {
-            // Step 1: Find target and process attacks (which might set entity.speed to 0 for Test Unit)
+            // Step 1: Find target and process attacks
             const target = findSummonTarget(entity);
             if (target) {
                 handleSummonAttacks(entity, target, timestamp);
+                // Stop-to-shoot: Elite Operator halts while firing
+                if (entity.type.stopsToShoot) entity.speed = 0;
             } else {
-                // If no target, ensure it's moving at its base speed (for Test Unit to resume movement)
+                // Resume base speed when no target
                 entity.speed = entity.type.speed;
             }
 
-            // Step 2: Move the entity based on its current speed (potentially 0 if it stopped for Test Unit)
+            // Step 2: Move the entity
             moveEntity(entity, true);
 
             // Step 3: Handle kamikaze cubes (Beta Yellow) - Check for proximity AFTER movement
@@ -3697,18 +3816,18 @@ function handleSummonAttacks(entity, target, timestamp) {
             entity.lastRailgun = timestamp;
         }
     } else if (entity.type.damage && timestamp - entity.lastFired >= entity.type.fireRate) {
-        if (entity.type.aoe) { // Orange Square or Beta Black
-            const aoeRange = entity.type.aoeRange || 2; // Beta Black has 3 tile AOE
+        if (entity.type.aoe) { // Orange Square, Beta Black, Exec Artillery
+            const aoeRange = entity.type.aoeRange || 2;
             enemies.forEach(enemy => {
-                if (!enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.range * GRID_SIZE) {
+                if (!enemy.isSummon && calculateDistance(target.x, target.y, enemy.x, enemy.y) <= aoeRange * GRID_SIZE) {
                     const damage = enemy === target ? (entity.type.directDamage || entity.type.damage) : entity.type.damage;
                     applyDamage(enemy, damage, 'explosive');
                 }
             });
             explosions.push({ x: target.x, y: target.y, size: 0, maxSize: aoeRange * GRID_SIZE, startTime: timestamp, duration: 500 });
-            const projectileColor = entity.type.name.includes('Beta Black') ? '#1A1A1A' : 'orange';
+            const projectileColor = entity.type.name.includes('Beta Black') ? '#1A1A1A' : (entity.type.color || 'orange');
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: projectileColor, width: 2, startTime: timestamp, duration: 200 });
-        } else { // Blue Square, Pink Square, Green Square, Beta Gray
+        } else { // Blue Square, Pink Square, Green Square, Beta Gray, Elite Operator, Exec Tank
             const damage = entity.type.damage;
             applyDamage(target, damage);
             if (entity.type.name === 'Green Square') {
@@ -3719,6 +3838,9 @@ function handleSummonAttacks(entity, target, timestamp) {
                 projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'pink', width: 1, startTime: timestamp, duration: 50 });
             } else if (entity.type.name.includes('Beta Gray')) {
                 projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: '#808080', width: 1, startTime: timestamp, duration: 100 });
+            } else {
+                // Generic summon projectile (Elite Operator, Exec Tank, etc.)
+                projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: entity.type.color, width: 2, startTime: timestamp, duration: 100 });
             }
         }
         entity.lastFired = timestamp;
@@ -4432,7 +4554,11 @@ function damageBase(enemy) {
     // END OMEGA BOSS LOOP SYSTEM
     // ═══════════════════════════════════════════════════════════════
 
-    const damage = Math.max(1, Math.floor(enemy.type.baseHp / 2));
+    // Scale leak damage by remaining HP so weakened enemies leak for less.
+    const maxHp = Number.isFinite(enemy.maxHp) && enemy.maxHp > 0 ? enemy.maxHp : enemy.type.baseHp;
+    const currentHp = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : maxHp;
+    const hpRatio = Math.max(0, Math.min(1, currentHp / maxHp));
+    const damage = Math.max(1, Math.floor(currentHp));
     baseHp -= damage;
     if (baseHp <= 0 && !isGameOver) gameOver();
     baseHpDisplay.textContent = Math.max(0, baseHp);

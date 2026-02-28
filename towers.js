@@ -5,7 +5,7 @@ const TOWER_TYPES = {
     GUNNER: {
         name: 'Gunner',
         color: 'yellow',
-        cost: 150,
+        cost: 100,
         aoe: false,
         summons: false,
         levels: [
@@ -16,10 +16,24 @@ const TOWER_TYPES = {
         ]
     },
 
+    Operator: {
+        name: 'Operator',
+        color: 'gray',
+        cost: 250,
+        aoe: false,
+        summons: false,
+        levels: [
+            { damage: 2, fireRate: 1750, range: 4, burstcount: 3, burstfirerate: 250, upgradeCost: 0 },
+            { damage: 4, fireRate: 1600, range: 5, burstcount: 5, burstfirerate: 250, upgradeCost: 200 },
+            { damage: 6, fireRate: 1500, range: 6, burstcount: 6, burstfirerate: 150, upgradeCost: 500 },
+            { damage: 10, fireRate: 1250, range: 7, burstcount: 8, burstfirerate: 125, upgradeCost: 800 }
+        ]
+    },
+
     SNIPER: {
         name: 'Sniper',
         color: 'red',
-        cost: 500,
+        cost: 350,
         aoe: false,
         summons: false,
         levels: [
@@ -33,7 +47,7 @@ const TOWER_TYPES = {
     ROCKETER: {
         name: 'Rocketer',
         color: 'orange',
-        cost: 350,
+        cost: 650,
         aoe: true,
         summons: false,
         levels: [
@@ -70,7 +84,7 @@ const TOWER_TYPES = {
             { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }], upgradeCost: 1000 },
             { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }, { type: 'GRAY', spawnRate: 15000 }], upgradeCost: 2500 },
             { summons: [{ type: 'RED_L4', spawnRate: 9000 }, { type: 'YELLOW_L4', spawnRate: 9000 }, { type: 'GRAY_L4', spawnRate: 9000 }, { type: 'DARK_RED', spawnRate: 18000 }], upgradeCost: 6250 },
-            { summons: [{ type: 'DARK_RED_L5', spawnRate: 12000 }, { type: 'CYAN', spawnRate: 20000 }], upgradeCost: 10000 }
+            { summons: [{ type: 'DARK_RED_L5', spawnRate: 12000 }, { type: 'CYAN', spawnRate: 20000 }], upgradeCost: 15000 }
         ]
     },
 
@@ -83,9 +97,9 @@ const TOWER_TYPES = {
         farm: true,
         levels: [
             { cashPerWave: 100, upgradeCost: 0 },
-            { cashPerWave: 200, upgradeCost: 250 },
-            { cashPerWave: 500, upgradeCost: 600 },
-            { cashPerWave: 1500, upgradeCost: 1500 }
+            { cashPerWave: 200, upgradeCost: 300 },
+            { cashPerWave: 500, upgradeCost: 800 },
+            { cashPerWave: 1500, upgradeCost: 2000 }
         ]
     },
 
@@ -141,19 +155,20 @@ const TOWER_TYPES = {
     EXECUTIVE: {
         name: 'Executive',
         color: '#DC143C',
-        cost: 3000,
+        cost: 3500,
         aoe: false,
-        summons: false,
+        summons: true,
+        isHybrid: true,
         hasAbility: true,
         limit: 1,
         abilityCost: 14000,
         abilityCooldown: 30000,
         levels: [
-            { damage: 15, fireRate: 2000, range: 2, upgradeCost: 0 },
-            { damage: 20, fireRate: 1000, range: 3, upgradeCost: 800 },
-            { damage: 35, fireRate: 500, range: 4, upgradeCost: 3000 },
-            { damage: 30, fireRate: 100, range: 5, upgradeCost: 12000 },
-            { damage: 75, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true }
+            { damage: 20, fireRate: 2000, range: 2, upgradeCost: 0 },
+            { damage: 30, fireRate: 1000, range: 3, upgradeCost: 800 },
+            { damage: 50, fireRate: 500, range: 4, upgradeCost: 3000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 12000, count: 2 }] },
+            { damage: 45, fireRate: 100, range: 5, upgradeCost: 12000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 15000, count: 2 }, { type: 'EXEC_TANK', spawnRate: 30000, count: 1 }] },
+            { damage: 85, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true, summons: [{ type: 'ELITE_OPERATOR_L5', spawnRate: 20000, count: 3 }, { type: 'EXEC_TANK', spawnRate: 35000, count: 1 }, { type: 'EXEC_ARTILLERY', spawnRate: 50000, count: 1 }] }
         ]
     },
 
@@ -161,7 +176,7 @@ const TOWER_TYPES = {
     CHARGER: {
         name: 'Charger',
         color: 'cyan',
-        cost: 3250,
+        cost: 7250,
         aoe: false,
         summons: false,
         limit: 8,
@@ -169,10 +184,10 @@ const TOWER_TYPES = {
         targetCooldown: 3000,
         levels: [
             { damageMin: 10, damageMax: 20, fireRate: 250, range: 6, upgradeCost: 0 },
-            { damageMin: 25, damageMax: 35, fireRate: 200, range: 7, upgradeCost: 2000 },
-            { damageMin: 40, damageMax: 80, fireRate: 150, range: 8, upgradeCost: 5000 },
-            { damageMin: 50, damageMax: 100, chargeMaxMin: 200, chargeMaxMax: 250, chargeRate: 2, chargeInterval: 100, fireRate: 100, range: 8, upgradeCost: 12000, cannotBeBuffed: true },
-            { damageMin: 80, damageMax: 120, chargeMaxMin: 250, chargeMaxMax: 500, chargeRate: 5, chargeInterval: 100, fireRate: 100, range: 10, upgradeCost: 30000, cannotBeBuffed: true }
+            { damageMin: 25, damageMax: 35, fireRate: 200, range: 7, upgradeCost: 5000 },
+            { damageMin: 40, damageMax: 80, fireRate: 150, range: 8, upgradeCost: 15000 },
+            { damageMin: 50, damageMax: 100, chargeMaxMin: 200, chargeMaxMax: 250, chargeRate: 2, chargeInterval: 100, fireRate: 100, range: 8, upgradeCost: 30000, cannotBeBuffed: true },
+            { damageMin: 80, damageMax: 120, chargeMaxMin: 250, chargeMaxMax: 500, chargeRate: 5, chargeInterval: 100, fireRate: 100, range: 10, upgradeCost: 50000, cannotBeBuffed: true }
         ]
     },
 
@@ -860,6 +875,56 @@ const SUMMON_TYPES = {
         knockbackDirectDamage: 10000,
         knockbackPower: 5,
         isBossKnockbacker: true
+    },
+
+    // Executive summons
+    ELITE_OPERATOR: {
+        name: 'Elite Operator',
+        color: '#DC143C',
+        hp: 200,
+        speed: 0.4,
+        size: 22,
+        isSummon: true,
+        damage: 5,
+        fireRate: 100,
+        range: 6,
+        stopsToShoot: true
+    },
+    ELITE_OPERATOR_L5: {
+        name: 'Elite Operator',
+        color: '#FF1744',
+        hp: 200,
+        speed: 0.4,
+        size: 22,
+        isSummon: true,
+        damage: 10,
+        fireRate: 80,
+        range: 8,
+        stopsToShoot: true
+    },
+    EXEC_TANK: {
+        name: 'Exec Tank',
+        color: '#8B0000',
+        hp: 5000,
+        speed: 0.25,
+        size: 35,
+        isSummon: true,
+        damage: 25,
+        fireRate: 100,
+        range: 10
+    },
+    EXEC_ARTILLERY: {
+        name: 'Exec Artillery',
+        color: '#FF6347',
+        hp: 3000,
+        speed: 0.175,
+        size: 30,
+        isSummon: true,
+        damage: 250,
+        fireRate: 500,
+        range: Infinity,
+        aoe: true,
+        aoeRange: 2
     }
 };
 
