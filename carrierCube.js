@@ -33,13 +33,13 @@ const CARRIER_UNITS = {
     BOMBER: {
         name: 'Bomber Cube',
         color: '#FF4500',
-        damage: 6000,
-        damageL2: 10000,
+        damage: 4000,
+        damageL2: 6000,
         area: 4,
         areaL2: 6,
         count: 3,
         duration: 2000,
-        emCost: 1,
+        emCost: 2,
         cooldown: 5000,
         fullCooldown: 15000,
         paybackCooldown: 20000,
@@ -51,7 +51,7 @@ const CARRIER_UNITS = {
         name: 'Blisma Cube',
         color: '#8A2BE2',
         damage: 750,
-        burstCount: 14,
+        burstCount: 16,
         burstRate: 40,  // 0.04s
         fireRate: 2000, // 2s between bursts
         duration: 25000,
@@ -97,14 +97,14 @@ const CARRIER_UNITS = {
         minigunDamage: 500,
         minigunRate: 125,   // 0.125s = 125ms
         railgunDamage: 20000,
-        railgunRate: 4000,  // every 4s, targets strongest
+        railgunRate: 4000,  // every 4s, targets first in path
         missileDamage: 5000,
         missileCount: 2,
         missileRange: 4,    // 4 grid range
         missileRate: 2000,  // every 2s
         duration: 20000,
         emCost: 15,
-        cooldown: 20000,
+        cooldown: 25000,
         fullCooldown: 60000,
         paybackCooldown: 80000,
         hardLimit: 1,
@@ -320,23 +320,28 @@ function updateCarrierUnits() {
             }
 
             if (currentTime - unit.lastRailgunFire >= unit.type.railgunRate) {
-                // Filter to only target non-summon enemies - target first in array
-                const validTargets = enemies.filter(e => !e.isSummon && e.hp > 0);
-                if (validTargets.length > 0) {
-                    const firstEnemy = validTargets[0];
-                    if (firstEnemy) {
-                        applyDamage(firstEnemy, unit.type.railgunDamage);
-                        // Use the global railgunShots array for rendering
-                        railgunShots.push({
-                            x1: unit.x,
-                            y1: unit.y,
-                            x2: firstEnemy.x,
-                            y2: firstEnemy.y,
-                            alpha: 1,
-                            startTime: currentTime,
-                            duration: 500
-                        });
+                // Target first enemy in path (highest distanceTraveled)
+                let firstEnemy = null;
+                let maxDistanceTraveled = -Infinity;
+                for (const enemy of enemies) {
+                    if (!enemy.isSummon && enemy.hp > 0 && enemy.distanceTraveled > maxDistanceTraveled) {
+                        firstEnemy = enemy;
+                        maxDistanceTraveled = enemy.distanceTraveled;
                     }
+                }
+
+                if (firstEnemy) {
+                    applyDamage(firstEnemy, unit.type.railgunDamage);
+                    // Use the global railgunShots array for rendering
+                    railgunShots.push({
+                        x1: unit.x,
+                        y1: unit.y,
+                        x2: firstEnemy.x,
+                        y2: firstEnemy.y,
+                        alpha: 1,
+                        startTime: currentTime,
+                        duration: 500
+                    });
                     unit.lastRailgunFire = currentTime;
                 }
             }

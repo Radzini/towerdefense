@@ -6,6 +6,7 @@ const TOWER_TYPES = {
         name: 'Gunner',
         color: 'yellow',
         cost: 100,
+        damageType: 'bullet',
         aoe: false,
         summons: false,
         levels: [
@@ -20,6 +21,7 @@ const TOWER_TYPES = {
         name: 'Operator',
         color: 'gray',
         cost: 250,
+        damageType: 'bullet',
         aoe: false,
         summons: false,
         levels: [
@@ -34,6 +36,7 @@ const TOWER_TYPES = {
         name: 'Sniper',
         color: 'red',
         cost: 350,
+        damageType: 'piercing',
         aoe: false,
         summons: false,
         levels: [
@@ -48,6 +51,7 @@ const TOWER_TYPES = {
         name: 'Rocketer',
         color: 'orange',
         cost: 650,
+        damageType: 'explosive',
         aoe: true,
         summons: false,
         levels: [
@@ -62,6 +66,7 @@ const TOWER_TYPES = {
         name: 'Raygunner',
         color: 'purple',
         cost: 2000,
+        damageType: 'laser',
         aoe: false,
         summons: false,
         levels: [
@@ -107,6 +112,7 @@ const TOWER_TYPES = {
         name: 'Railgunner',
         color: '#00B7EB',
         cost: 2500,
+        damageType: 'piercing',
         aoe: false,
         summons: false,
         levels: [
@@ -156,6 +162,7 @@ const TOWER_TYPES = {
         name: 'Executive',
         color: '#DC143C',
         cost: 3500,
+        damageType: 'piercing',
         aoe: false,
         summons: true,
         isHybrid: true,
@@ -177,6 +184,7 @@ const TOWER_TYPES = {
         name: 'Charger',
         color: 'cyan',
         cost: 7250,
+        damageType: 'laser',
         aoe: false,
         summons: false,
         limit: 8,
@@ -213,6 +221,7 @@ const TOWER_TYPES = {
         name: 'Gunner Paragon',
         color: '#FF00FF',
         cost: 100000,
+        damageType: 'piercing',
         aoe: false,
         summons: false,
         size: 2,
@@ -264,6 +273,7 @@ const TOWER_TYPES = {
         name: 'Sniper Paragon',
         color: '#00FFFF',
         cost: 125000,
+        damageType: 'piercing',
         aoe: false,
         summons: false,
         size: 2,

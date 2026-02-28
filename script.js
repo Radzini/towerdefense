@@ -255,6 +255,24 @@ let isGameOver = false; // Flag to prevent multiple game over triggers
 // Enemy Types and Waves are now loaded from separate files (enemies.js and waves.js)
 // This keeps the codebase organized and manageable
 
+// Helper function to check if a grid cell overlaps with any tower (including multi-cell towers)
+function getTowerAtGrid(x, y) {
+    return towers.find(t => {
+        let sizeX = 1;
+        let sizeY = 1;
+
+        if (t.type === TOWER_TYPES.GUNNER_PARAGON || t.type === TOWER_TYPES.SNIPER_PARAGON || t.type === TOWER_TYPES.ELITE_SPAWNER) {
+            sizeX = 2; sizeY = 2;
+        } else if (t.type === TOWER_TYPES.CUBE_FACTORY) {
+            sizeX = 3; sizeY = 3;
+        } else if (t.type === TOWER_TYPES.CARRIER_CUBE) {
+            sizeX = 4; sizeY = 4;
+        }
+
+        return x >= t.gridX && x < t.gridX + sizeX && y >= t.gridY && y < t.gridY + sizeY;
+    });
+}
+
 // Initialize game
 function initGame() {
     // Register Carrier Cube Type
@@ -802,7 +820,7 @@ function handleCanvasClick(event) {
         return;
     }
 
-    const clickedTower = towers.find(t => t.gridX === gridX && t.gridY === gridY);
+    const clickedTower = getTowerAtGrid(gridX, gridY);
 
     if (clickedTower) {
         selectedCell = { x: gridX, y: gridY };
@@ -874,7 +892,7 @@ function handleMouseMove(event) {
         });
 
         // Check if hovering over a tower
-        const hoveredTower = towers.find(t => t.gridX === gridX && t.gridY === gridY);
+        const hoveredTower = getTowerAtGrid(gridX, gridY);
         if (hoveredTower || hoveredEnemy) {
             canvas.style.cursor = 'pointer';
         } else {
@@ -1651,7 +1669,7 @@ function showCarrierSpawnUI(tower) {
                     <div>⏳ Duration: <span style="color: #fff;">${unit.duration / 1000}s on field</span></div>
                     <div style="color: #ffcc00; margin-top: 6px;">── Weapons ──</div>
                     <div>🔫 Minigun: <span style="color: #ff6666;">${minigunDPS} DPS</span></div>
-                    <div>⚡ Railgun: <span style="color: #00bfff;">${railgunDPS} DPS</span> (strongest)</div>
+                    <div>⚡ Railgun: <span style="color: #00bfff;">${railgunDPS} DPS</span> (first)</div>
                     <div>🚀 Missiles: <span style="color: #ff8800;">${missileDPS} DPS</span> (${unit.missileRange} tile AOE)</div>
                     <div style="margin-top: 4px;">💰 Cost: <span style="color: #ffd700;">$${unit.cost.toLocaleString()}</span></div>
                     <div>🔄 Cooldown: <span style="color: #aaa;">${unit.cooldown / 1000}s</span></div>
@@ -1856,8 +1874,8 @@ function upgradeTower(tower) {
         const paragonTower = {
             gridX: gridX,
             gridY: gridY,
-            x: gridX * GRID_SIZE + GRID_SIZE / 2,
-            y: gridY * GRID_SIZE + GRID_SIZE / 2,
+            x: gridX * GRID_SIZE + GRID_SIZE, // Center for 2x2 tower
+            y: gridY * GRID_SIZE + GRID_SIZE, // Center for 2x2 tower
             type: TOWER_TYPES.GUNNER_PARAGON,
             level: radian,
             lastFired: 0,
@@ -1939,8 +1957,8 @@ function upgradeTower(tower) {
         const paragonTower = {
             gridX: gridX,
             gridY: gridY,
-            x: gridX * GRID_SIZE + GRID_SIZE / 2,
-            y: gridY * GRID_SIZE + GRID_SIZE / 2,
+            x: gridX * GRID_SIZE + GRID_SIZE, // Center for 2x2 tower
+            y: gridY * GRID_SIZE + GRID_SIZE, // Center for 2x2 tower
             type: TOWER_TYPES.SNIPER_PARAGON,
             level: radian,
             lastFired: 0,
@@ -2402,7 +2420,7 @@ function updateOrbitalStrike(timestamp) {
             // Deal cluster damage to ALL enemies in main strike square
             for (const enemy of enemies) {
                 if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
-                    applyDamage(enemy, ORBITAL_STRIKE_STATS.CLUSTER_TICK_DAMAGE, 'explosive');
+                    applyDamage(enemy, ORBITAL_STRIKE_STATS.CLUSTER_TICK_DAMAGE, 'piercing');
                 }
             }
         }
@@ -2425,7 +2443,7 @@ function updateOrbitalStrike(timestamp) {
         // Deal final massive damage to all in square range
         for (const enemy of enemies) {
             if (isInSquareBounds(orbitalStrikeData.x, orbitalStrikeData.y, enemy.x, enemy.y, orbitalStrikeData.range) && !enemy.isSummon) {
-                applyDamage(enemy, ORBITAL_STRIKE_STATS.FINAL_EXPLOSION_DAMAGE, 'explosive');
+                applyDamage(enemy, ORBITAL_STRIKE_STATS.FINAL_EXPLOSION_DAMAGE, 'piercing');
             }
         }
 
@@ -2923,18 +2941,6 @@ function drawGrid() {
 // Draw selected tower range
 function drawSelectedTowerRange() {
     if (selectedTower && selectedCell) {
-        const stats = selectedTower.levels[0];
-        const rangeRadius = (stats.range || 0) * GRID_SIZE;
-
-        // Draw range circle
-        ctx.beginPath();
-        ctx.arc(selectedCell.x * GRID_SIZE + GRID_SIZE / 2, selectedCell.y * GRID_SIZE + GRID_SIZE / 2, rangeRadius, 0, 2 * Math.PI);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.fill();
-
-        // Draw tower placement preview square(s)
-        ctx.fillStyle = selectedTower.color;
-        ctx.globalAlpha = 0.6;
         let previewSizeX = 1;
         let previewSizeY = 1;
 
@@ -2945,17 +2951,34 @@ function drawSelectedTowerRange() {
         } else if (selectedTower === TOWER_TYPES.CARRIER_CUBE) {
             previewSizeX = 4; previewSizeY = 4;
         }
+
+        const stats = selectedTower.levels[0];
+        const rangeRadius = (stats.range || 0) * GRID_SIZE;
+
+        // Draw range circle centered realistically based on tower footprint bounds
+        const centerX = selectedCell.x * GRID_SIZE + (previewSizeX * GRID_SIZE) / 2;
+        const centerY = selectedCell.y * GRID_SIZE + (previewSizeY * GRID_SIZE) / 2;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, rangeRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.fill();
+
+        // Draw tower placement preview square(s)
+        ctx.fillStyle = selectedTower.color;
+        ctx.globalAlpha = 0.6;
         ctx.fillRect(selectedCell.x * GRID_SIZE, selectedCell.y * GRID_SIZE, previewSizeX * GRID_SIZE, previewSizeY * GRID_SIZE);
         ctx.globalAlpha = 1.0;
 
     } else if (selectedCell) { // Showing range of an already placed tower
-        const hoveredTower = towers.find(t => t.gridX === selectedCell.x && t.gridY === selectedCell.y);
+        const hoveredTower = getTowerAtGrid(selectedCell.x, selectedCell.y);
 
         if (hoveredTower && !hoveredTower.type.farm && (!hoveredTower.type.summons || hoveredTower.type.isHybrid) && !hoveredTower.type.support) {
             const stats = hoveredTower.type.levels[hoveredTower.level - 1];
             const buffs = (stats.cannotBeBuffed || hoveredTower.type.cannotBeBuffed) ? { rangeBoost: 0 } : getCommanderBuffs(hoveredTower);
             const rangeBonus = hoveredTower.type.rangeBonus || 0;
             const buffedRange = (stats.range + buffs.rangeBoost + rangeBonus) * GRID_SIZE;
+
             ctx.beginPath();
             ctx.arc(hoveredTower.x, hoveredTower.y, buffedRange, 0, 2 * Math.PI);
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -3191,7 +3214,7 @@ function updateTowers(timestamp) {
                         damage = Math.floor(Math.random() * (stats.damageMax - stats.damageMin + 1)) + stats.damageMin;
                     }
 
-                    applyDamage(tower.lockedTarget, damage, 'laser');
+                    applyDamage(tower.lockedTarget, damage, tower.type.damageType || 'laser');
                     tower.isFiring = true;
 
                     // Track last damage dealt for DPS calculation
@@ -3236,7 +3259,7 @@ function updateTowers(timestamp) {
                 // Fire burst shots
                 if (tower.burstRemaining > 0 && timestamp - tower.lastBurstShot >= stats.burstfirerate) {
                     if (!tower.target.isSummon && tower.target.hp > 0) {
-                        applyDamage(tower.target, buffedDamage);
+                        applyDamage(tower.target, buffedDamage, tower.type.damageType || 'bullet');
                         projectiles.push({
                             x1: tower.x, y1: tower.y,
                             x2: tower.target.x, y2: tower.target.y,
@@ -3258,7 +3281,7 @@ function updateTowers(timestamp) {
                     enemies.forEach(enemy => {
                         if (!enemy.isSummon && isInRange(tower, enemy)) {
                             const damage = enemy === directHit ? buffedDirectDamage : buffedDamage;
-                            applyDamage(enemy, damage, 'explosive');
+                            applyDamage(enemy, damage, tower.type.damageType || 'explosive');
                         }
                     });
                     projectiles.push({
@@ -3281,12 +3304,12 @@ function updateTowers(timestamp) {
                     });
                 } else if (tower.type.name === 'Raygunner') {
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage, 'laser');
+                        applyDamage(tower.target, buffedDamage, tower.type.damageType || 'laser');
                         tower.isFiring = true;
                     }
                 } else if (tower.type.name === 'Railgunner') {
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage, 'piercing');
+                        applyDamage(tower.target, buffedDamage, tower.type.damageType || 'piercing');
                         railgunShots.push({
                             x1: tower.x,
                             y1: tower.y,
@@ -3300,7 +3323,7 @@ function updateTowers(timestamp) {
                 } else if (tower.type === TOWER_TYPES.SNIPER_PARAGON) {
                     // Sniper Paragon shoots like sniper with explosion delay at Radian 3
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage, 'piercing');
+                        applyDamage(tower.target, buffedDamage, tower.type.damageType || 'piercing');
                         railgunShots.push({
                             x1: tower.x,
                             y1: tower.y,
@@ -3339,7 +3362,7 @@ function updateTowers(timestamp) {
                     }
                 } else {
                     if (!tower.target.isSummon) {
-                        applyDamage(tower.target, buffedDamage);
+                        applyDamage(tower.target, buffedDamage, tower.type.damageType || 'bullet');
                         projectiles.push({
                             x1: tower.x,
                             y1: tower.y,
