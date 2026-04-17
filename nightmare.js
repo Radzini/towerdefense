@@ -245,7 +245,7 @@ function generateNightmareWaves() {
             groups: [
                 { enemies: { gargantuar_x: 20 }, spawnInterval: 100, waitAfter: 2000 },
                 { enemies: { gargantuar_z: 5 }, spawnInterval: 500, waitAfter: 8000 },
-                { enemies: { gargantuar_king: 1 }, spawnInterval: 0, waitAfter: 0 }
+                { enemies: { gargantuar_king_nm: 1 }, spawnInterval: 0, waitAfter: 0 }
             ],
             endWaitTime: 60000
         },

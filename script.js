@@ -41,10 +41,15 @@ const towerButtons = {
     railgunner: document.getElementById('railgunnerBtn'),
     eliteSpawner: document.getElementById('eliteSpawnerBtn'),
     commander: document.getElementById('commanderBtn'),
+    agent: document.getElementById('agentBtn'),
     executive: document.getElementById('executiveBtn'),
     cubeFactory: document.getElementById('cubeFactoryBtn'),
     charger: document.getElementById('chargerBtn'),
-    carrierCube: document.getElementById('carrierCubeBtn')
+    carrierCube: document.getElementById('carrierCubeBtn'),
+    mafia: document.getElementById('mafiaBtn'),
+    cbase: document.getElementById('cbaseBtn'),
+    commando: document.getElementById('commandoBtn'),
+    lunarCube: document.getElementById('lunarCubeBtn')
 };
 let lastJPressTime = 0;
 
@@ -69,6 +74,205 @@ let gameSpeed = 1;
 let invincible = false;
 let lastFrameTime = 0;
 let frameDelta = 16.667; // ms since last frame, init to 60fps
+
+// ===== SCREEN SHAKE =====
+let screenShake = { intensity: 0, duration: 0, startTime: -9999 };
+
+window.triggerShake = function (intensity, duration) {
+    if (intensity > screenShake.intensity * (1 - (performance.now() - screenShake.startTime) / screenShake.duration)) {
+        screenShake = { intensity, duration, startTime: performance.now() };
+    }
+};
+
+// ===== WEB AUDIO SFX =====
+const sfxCtx = (() => {
+    try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+})();
+
+function sfxUnlock() {
+    if (sfxCtx && sfxCtx.state === 'suspended') sfxCtx.resume();
+}
+document.addEventListener('click', sfxUnlock, { once: true });
+document.addEventListener('keydown', sfxUnlock, { once: true });
+
+function sfxPlay(fn) {
+    if (!sfxCtx) return;
+    if (sfxCtx.state === 'suspended') sfxCtx.resume();
+    try { fn(sfxCtx); } catch (e) { }
+}
+
+// Shoot — quick high tick, different pitch per tower type
+window.sfxShoot = function (color = 'white') {
+    sfxPlay(ac => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        const pitchMap = { '#FF4444': 600, '#4488FF': 700, '#AAAAAA': 500, '#FFD700': 900, '#00FFFF': 1100 };
+        osc.frequency.setValueAtTime(pitchMap[color] || 650, ac.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, ac.currentTime + 0.06);
+        gain.gain.setValueAtTime(0.08, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.07);
+        osc.start(); osc.stop(ac.currentTime + 0.07);
+    });
+};
+
+// Explosion — low noise burst
+window.sfxExplosion = function (big = false) {
+    sfxPlay(ac => {
+        const bufSize = ac.sampleRate * (big ? 0.6 : 0.25);
+        const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(big ? 180 : 300, ac.currentTime);
+        lp.frequency.exponentialRampToValueAtTime(40, ac.currentTime + (big ? 0.5 : 0.2));
+        const gain = ac.createGain();
+        gain.gain.setValueAtTime(big ? 1.2 : 0.6, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + (big ? 0.6 : 0.25));
+        src.connect(lp); lp.connect(gain); gain.connect(ac.destination);
+        src.start(); src.stop(ac.currentTime + (big ? 0.6 : 0.25));
+    });
+};
+
+// Orbital strike impact — bone-rattling boom
+window.sfxOrbitalImpact = function () {
+    sfxPlay(ac => {
+        // Sub-bass thud
+        const osc = ac.createOscillator();
+        const gainO = ac.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, ac.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(20, ac.currentTime + 0.8);
+        gainO.gain.setValueAtTime(1.5, ac.currentTime);
+        gainO.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.8);
+        osc.connect(gainO); gainO.connect(ac.destination);
+        osc.start(); osc.stop(ac.currentTime + 0.8);
+        // White noise layer
+        const bufSize = ac.sampleRate * 0.5;
+        const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        const src = ac.createBufferSource();
+        src.buffer = buf;
+        const lp = ac.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 200;
+        const gainN = ac.createGain();
+        gainN.gain.setValueAtTime(0.9, ac.currentTime);
+        gainN.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.5);
+        src.connect(lp); lp.connect(gainN); gainN.connect(ac.destination);
+        src.start(); src.stop(ac.currentTime + 0.5);
+    });
+};
+
+// Wave start — ascending synth hit
+window.sfxWaveStart = function () {
+    sfxPlay(ac => {
+        [220, 330, 440, 550].forEach((freq, i) => {
+            const osc = ac.createOscillator();
+            const gain = ac.createGain();
+            osc.type = 'triangle';
+            osc.frequency.value = freq;
+            const t = ac.currentTime + i * 0.07;
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.2, t + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+            osc.connect(gain); gain.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.3);
+        });
+    });
+};
+
+// Wave complete — quick rising 3-note
+window.sfxWaveComplete = function () {
+    sfxPlay(ac => {
+        [440, 550, 660].forEach((freq, i) => {
+            const osc = ac.createOscillator();
+            const gain = ac.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            const t = ac.currentTime + i * 0.12;
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+            osc.connect(gain); gain.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.35);
+        });
+    });
+};
+
+// Base takes damage — harsh alarm thud
+window.sfxBaseDamage = function () {
+    sfxPlay(ac => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, ac.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, ac.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.4, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.3);
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.start(); osc.stop(ac.currentTime + 0.3);
+    });
+};
+
+// Tower placed — soft confirmation click
+window.sfxPlace = function () {
+    sfxPlay(ac => {
+        const osc = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ac.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, ac.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.15, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.1);
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.start(); osc.stop(ac.currentTime + 0.1);
+    });
+};
+
+// Upgrade — ascending double-beep
+window.sfxUpgrade = function () {
+    sfxPlay(ac => {
+        [600, 900].forEach((freq, i) => {
+            const osc = ac.createOscillator();
+            const gain = ac.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            const t = ac.currentTime + i * 0.1;
+            gain.gain.setValueAtTime(0.18, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.connect(gain); gain.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.12);
+        });
+    });
+};
+
+// ===== WAVE BANNER =====
+function showWaveBanner(waveNum, modeName) {
+    const existing = document.getElementById('waveBanner');
+    if (existing) existing.remove();
+    const banner = document.createElement('div');
+    banner.id = 'waveBanner';
+    banner.innerHTML = `<span class="wave-banner-label">WAVE</span><span class="wave-banner-num">${waveNum}</span>`;
+    document.body.appendChild(banner);
+    // Auto-remove after animation
+    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 2000);
+}
+
+function showSecretWaveBanner() {
+    const existing = document.getElementById('waveBanner');
+    if (existing) existing.remove();
+    const banner = document.createElement('div');
+    banner.id = 'waveBanner';
+    banner.innerHTML = `<span class="wave-banner-label">SECRET</span><span class="wave-banner-num">WAVE</span>`;
+    banner.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.22), rgba(135,206,250,0.38), rgba(255,255,255,0.16))';
+    banner.style.borderColor = '#E8F7FF';
+    banner.style.boxShadow = '0 0 35px rgba(232,247,255,0.5), 0 0 70px rgba(135,206,250,0.25)';
+    document.body.appendChild(banner);
+    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 2600);
+}
 
 // Game Constants
 const GRID_SIZE = 40;
@@ -242,6 +446,26 @@ let hpBarCollapsed = false;
 let hpBarToggleRect = null;
 let lastTowerInfoUpdate = 0;
 let selectedTowerForTimer = null;
+let agentTargetingActive = false;
+let agentTargetingData = null;
+let agentHijackUntil = 0;
+let agentHijackMode = null;
+let agentSweeperEffects = [];
+let nextAgentSweeperId = 1;
+const SECRET_WAVE_START = 47;
+const SECRET_WAVE_CHANCE = 0.10;
+const MOON_CUBE_DASH_DISTANCE_TILES = 5;
+const MOON_CUBE_DASH_COOLDOWN = 50000;
+const MOON_CUBE_STOMP_COOLDOWN = 12000;
+const MOON_CUBE_ORB_RETURN_TIME = 4000;
+const LUNAR_TITAN_ROCKET_AOE_TILES = 4;
+let secretWaveState = {
+    forceAfterOmegaDeath: false,
+    activated: false,
+    activationRolled: false,
+    activationReason: null
+};
+let secretWaveBossAudio = null;
 
 // Wave Management State
 let activeWaves = []; // Array of active wave objects
@@ -401,10 +625,15 @@ function setupEventListeners() {
     towerButtons.railgunner.addEventListener('click', () => selectTowerType(TOWER_TYPES.RAILGUNNER));
     towerButtons.eliteSpawner.addEventListener('click', () => selectTowerType(TOWER_TYPES.ELITE_SPAWNER));
     towerButtons.commander.addEventListener('click', () => selectTowerType(TOWER_TYPES.COMMANDER));
+    if (towerButtons.agent) towerButtons.agent.addEventListener('click', () => selectTowerType(TOWER_TYPES.AGENT));
     towerButtons.executive.addEventListener('click', () => selectTowerType(TOWER_TYPES.EXECUTIVE));
     towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY));
     towerButtons.charger.addEventListener('click', () => selectTowerType(TOWER_TYPES.CHARGER));
     towerButtons.carrierCube.addEventListener('click', () => selectTowerType(TOWER_TYPES.CARRIER_CUBE));
+    if (towerButtons.mafia) towerButtons.mafia.addEventListener('click', () => selectTowerType(TOWER_TYPES.MAFIA));
+    if (towerButtons.cbase) towerButtons.cbase.addEventListener('click', () => selectTowerType(TOWER_TYPES.CBASE));
+    if (towerButtons.commando) towerButtons.commando.addEventListener('click', () => selectTowerType(TOWER_TYPES.COMMANDO));
+    if (towerButtons.lunarCube) towerButtons.lunarCube.addEventListener('click', () => selectTowerType(TOWER_TYPES.LUNAR_CUBE));
 
 
     // Canvas interactions
@@ -445,9 +674,11 @@ function setupEventListeners() {
     closeTowerInfo.addEventListener('click', () => {
         towerInfoPanel.style.display = 'none';
         towerActions.style.display = 'none';
-        document.getElementById('carrierSpawnPanel').style.display = 'none'; // Fix: Close carrier UI
+        document.getElementById('carrierSpawnPanel').style.display = 'none';
         currentInfoTower = null;
-        selectedCell = null; // Clear selected cell to hide range
+        window.currentSelectedTower = null; // add this
+        selectedCell = null;
+        if (typeof window._inspectedEntity !== 'undefined') window._inspectedEntity = null;
     });
 
     // Tower action buttons (using same pattern as cheat buttons)
@@ -475,6 +706,8 @@ function setupEventListeners() {
                 towerActions.style.display = 'none';
             } else if (tower.type === TOWER_TYPES.GUNNER_PARAGON) {
                 triggerParagonAlpha(tower);
+            } else if (tower.type === TOWER_TYPES.COMMANDO) {
+                triggerGoldenCommando(tower);
             }
         }
     });
@@ -583,7 +816,20 @@ function setupEventListeners() {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
+        window.keysPressed = window.keysPressed || {};
+        window.keysPressed[e.key.toLowerCase()] = true;
+
         if (gameModeUI.style.display !== 'none') return;
+
+        // Hijack for Drone abilities and movement
+        if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE) {
+            if (['1', '2', '3', '4', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].includes(e.key)) {
+                if (typeof handleDroneAbility === 'function') {
+                    handleDroneAbility(e.key, window.currentMouseX || 0, window.currentMouseY || 0);
+                }
+                return; // Prevent normal tower selection
+            }
+        }
 
         // ESC key to cancel placement or close tower panel
         if (e.key === 'Escape') {
@@ -660,7 +906,23 @@ function setupEventListeners() {
             selectTowerType(TOWER_TYPES.CHARGER);
         } else if (e.key === 'x' || e.key === 'X') {
             selectTowerType(TOWER_TYPES.CARRIER_CUBE);
+        } else if (e.key === 'v' || e.key === 'V') {
+            selectTowerType(TOWER_TYPES.DRONE);
+        } else if (e.key === 'm' || e.key === 'M') {
+            selectTowerType(TOWER_TYPES.MAFIA);
+        } else if (e.key === 'b' || e.key === 'B') {
+            selectTowerType(TOWER_TYPES.CBASE);
+        } else if (e.key === 'n' || e.key === 'N') {
+            selectTowerType(TOWER_TYPES.COMMANDO);
+        } else if (e.key === 'l' || e.key === 'L') {
+            selectTowerType(TOWER_TYPES.LUNAR_CUBE);
+        } else if (e.key === 'h' || e.key === 'H') {
+            selectTowerType(TOWER_TYPES.AGENT);
         }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (window.keysPressed) window.keysPressed[e.key.toLowerCase()] = false;
     });
 
     // Game mode UI listeners
@@ -718,6 +980,9 @@ function closeMenu() {
 function updateCashDisplay() {
     if (cashDisplay) {
         cashDisplay.textContent = cash;
+        cashDisplay.classList.remove('hud-pop');
+        void cashDisplay.offsetWidth;
+        cashDisplay.classList.add('hud-pop');
     }
 }
 
@@ -732,10 +997,15 @@ function updateTowerButtonCosts() {
     document.querySelector('#railgunnerBtn .tower-cost').textContent = '$' + TOWER_TYPES.RAILGUNNER.cost;
     document.querySelector('#eliteSpawnerBtn .tower-cost').textContent = '$' + TOWER_TYPES.ELITE_SPAWNER.cost;
     document.querySelector('#commanderBtn .tower-cost').textContent = '$' + TOWER_TYPES.COMMANDER.cost;
+    if (document.querySelector('#agentBtn .tower-cost')) document.querySelector('#agentBtn .tower-cost').textContent = '$' + TOWER_TYPES.AGENT.cost;
     document.querySelector('#executiveBtn .tower-cost').textContent = '$' + TOWER_TYPES.EXECUTIVE.cost;
     document.querySelector('#cubeFactoryBtn .tower-cost').textContent = '$' + TOWER_TYPES.CUBE_FACTORY.cost;
     document.querySelector('#chargerBtn .tower-cost').textContent = '$' + TOWER_TYPES.CHARGER.cost;
     document.querySelector('#carrierCubeBtn .tower-cost').textContent = '$' + TOWER_TYPES.CARRIER_CUBE.cost;
+    if (document.querySelector('#mafiaBtn .tower-cost')) document.querySelector('#mafiaBtn .tower-cost').textContent = '$' + TOWER_TYPES.MAFIA.cost;
+    if (document.querySelector('#cbaseBtn .tower-cost')) document.querySelector('#cbaseBtn .tower-cost').textContent = '$' + TOWER_TYPES.CBASE.cost;
+    if (document.querySelector('#commandoBtn .tower-cost')) document.querySelector('#commandoBtn .tower-cost').textContent = '$' + TOWER_TYPES.COMMANDO.cost;
+    if (document.querySelector('#lunarCubeBtn .tower-cost')) document.querySelector('#lunarCubeBtn .tower-cost').textContent = '$' + TOWER_TYPES.LUNAR_CUBE.cost;
 }
 
 // Update tower selection UI
@@ -752,10 +1022,15 @@ function updateTowerSelection() {
             [TOWER_TYPES.FARM]: towerButtons.farm,
             [TOWER_TYPES.ELITE_SPAWNER]: towerButtons.eliteSpawner,
             [TOWER_TYPES.COMMANDER]: towerButtons.commander,
+            [TOWER_TYPES.AGENT]: towerButtons.agent,
             [TOWER_TYPES.EXECUTIVE]: towerButtons.executive,
             [TOWER_TYPES.CUBE_FACTORY]: towerButtons.cubeFactory,
             [TOWER_TYPES.CHARGER]: towerButtons.charger,
-            [TOWER_TYPES.CARRIER_CUBE]: towerButtons.carrierCube
+            [TOWER_TYPES.CARRIER_CUBE]: towerButtons.carrierCube,
+            [TOWER_TYPES.MAFIA]: towerButtons.mafia,
+            [TOWER_TYPES.CBASE]: towerButtons.cbase,
+            [TOWER_TYPES.COMMANDO]: towerButtons.commando,
+            [TOWER_TYPES.LUNAR_CUBE]: towerButtons.lunarCube
         };
         const btn = btnMap[selectedTower];
         if (btn) btn.classList.add('selected');
@@ -764,6 +1039,7 @@ function updateTowerSelection() {
 
 // Select tower type
 function selectTowerType(towerType) {
+    if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE) return;
     if (towerType === TOWER_TYPES.FARM && farmCount >= 5) {
         return;
     }
@@ -820,9 +1096,66 @@ function handleCanvasClick(event) {
         return;
     }
 
+    // Handle Mafia ability targeting FIRST
+    if (typeof mafia_targeting_active !== 'undefined' && mafia_targeting_active) {
+        // Find clicked enemy
+        const clickedEnemy = enemies.find(e => {
+            if (e.isSummon || e.hp <= 0) return false;
+            const dx = mouseX - e.x;
+            const dy = mouseY - e.y;
+            return Math.sqrt(dx * dx + dy * dy) <= (e.type.size || 20);
+        });
+        if (clickedEnemy) {
+            execute_mafia_targeted_ability(clickedEnemy);
+        } else {
+            // Cancel targeting if clicking empty space
+            mafia_targeting_active = false;
+            mafia_targeting_data = null;
+            canvas.style.cursor = 'default';
+
+            // Reopen tower panel since targeting is cancelled
+            if (typeof updateTowerSelection === 'function') updateTowerSelection();
+            if (typeof showTowerInfo === 'function' && window.currentInfoTower) {
+                showTowerInfo(window.currentInfoTower);
+            }
+        }
+        return; // Stop processing other clicks while in targeting mode
+    }
+
+    if (agentTargetingActive) {
+        const clickedEnemy = enemies.find(e => {
+            if (e.isSummon || e.hp <= 0) return false;
+            const dx = mouseX - e.x;
+            const dy = mouseY - e.y;
+            return Math.sqrt(dx * dx + dy * dy) <= (e.type.size || 20);
+        });
+
+        if (clickedEnemy) {
+            executeAgentTargetedAbility(clickedEnemy);
+        } else {
+            cancelAgentTargeting();
+        }
+        return;
+    }
+
+    // Check if clicking on an enemy/summon for stat inspector NEXT
+    // "enemy panel should be visible once i click the enemy, it doesnt matter on the tower"
+    const clickedEntity = enemies.find(e => {
+        if (e.hp <= 0) return false;
+        const dx = mouseX - e.x;
+        const dy = mouseY - e.y;
+        return Math.sqrt(dx * dx + dy * dy) <= (e.type.size || 20);
+    });
+
+    if (clickedEntity && typeof show_entity_stats_panel === 'function') {
+        show_entity_stats_panel(clickedEntity);
+        return; // Stop processing other clicks if an entity was clicked
+    }
+
     const clickedTower = getTowerAtGrid(gridX, gridY);
 
     if (clickedTower) {
+        window._inspectedEntity = null; // Clear entity inspector
         selectedCell = { x: gridX, y: gridY };
         selectedTower = null;
         updateTowerSelection();
@@ -838,8 +1171,21 @@ function handleMouseMove(event) {
     const rect = canvas.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
+    window.currentMouseX = mouseX;
+    window.currentMouseY = mouseY;
     const gridX = Math.floor(mouseX / GRID_SIZE);
     const gridY = Math.floor(mouseY / GRID_SIZE);
+
+    // If Drone upgrade panel is open, enforce crosshair cursor
+    if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE) {
+        canvas.style.cursor = 'crosshair';
+    } else if (typeof mafia_targeting_active !== 'undefined' && mafia_targeting_active) {
+        canvas.style.cursor = 'crosshair';
+    } else if (agentTargetingActive) {
+        canvas.style.cursor = 'crosshair';
+    } else {
+        canvas.style.cursor = 'default';
+    }
 
     // If in orbital strike mode, update targeting position
     if (orbitalStrikeActive) {
@@ -893,20 +1239,220 @@ function handleMouseMove(event) {
 
         // Check if hovering over a tower
         const hoveredTower = getTowerAtGrid(gridX, gridY);
-        if (hoveredTower || hoveredEnemy) {
-            canvas.style.cursor = 'pointer';
-        } else {
-            canvas.style.cursor = 'default';
+        // Only override pointer if not in Drone mode and not in Mafia targeting mode
+        if (!(currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE) &&
+            !(typeof mafia_targeting_active !== 'undefined' && mafia_targeting_active) &&
+            !agentTargetingActive) {
+            if (hoveredTower || hoveredEnemy) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = 'default';
+            }
         }
     }
 }
 
+function getEntityInfoPanelTitle(entity) {
+    return entity?.isSummon ? 'Unit Info' : 'Enemy Info';
+}
+
+function formatSeconds(ms) {
+    return `${Math.max(0, ms) / 1000 >= 10 ? ((Math.max(0, ms) / 1000).toFixed(0)) : ((Math.max(0, ms) / 1000).toFixed(1))}s`;
+}
+
+function getCBaseSurgeText(entity, now) {
+    if (!entity?.isCBaseSummon || !Number.isFinite(entity.spawnTime)) return 'N/A';
+    const elapsed = now - entity.spawnTime;
+    if (elapsed < 50000) return `Next in ${formatSeconds(50000 - elapsed)}`;
+    const cycleElapsed = (elapsed - 50000) % 50000;
+    if (cycleElapsed < 10000) return `Active ${formatSeconds(10000 - cycleElapsed)}`;
+    return `Next in ${formatSeconds(50000 - cycleElapsed)}`;
+}
+
+function show_entity_stats_panel(entity) {
+    if (!entity) return;
+
+    window._inspectedEntity = entity;
+    currentInfoTower = null;
+    window.currentSelectedTower = null;
+    lastTowerInfoUpdate = performance.now();
+    towerActions.style.display = 'none';
+    document.getElementById('carrierSpawnPanel').style.display = 'none';
+    const panelTitle = document.querySelector('#towerInfoPanel .panel-header h3');
+    if (panelTitle) panelTitle.textContent = getEntityInfoPanelTitle(entity);
+
+    const now = performance.now();
+    const typeLabel = entity.isSummon ? 'Summon (Ally)' : 'Enemy';
+    const hpPercent = entity.maxHp > 0 ? (entity.hp / entity.maxHp) * 100 : 0;
+    const statusEffects = [];
+
+    if ((entity.invulnerableUntil || 0) > now) {
+        statusEffects.push(`Invulnerable ${formatSeconds(entity.invulnerableUntil - now)}`);
+    }
+    if (entity.hasDroneSight) {
+        statusEffects.push('Drone Sight');
+    }
+    if (entity.isCBaseSummon && typeof entity.spawnTime === 'number') {
+        const elapsed = now - entity.spawnTime;
+        if (elapsed >= 50000 && ((elapsed - 50000) % 50000) < 10000) {
+            statusEffects.push('Damage Surge');
+        }
+    }
+
+    let infoHTML = `
+        <div class="info-row">
+            <div class="info-label">Name</div>
+            <div class="info-value">${entity.type.name}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">HP</div>
+            <div class="info-value">${Math.floor(entity.hp).toLocaleString()} / ${Math.floor(entity.maxHp).toLocaleString()} (${hpPercent.toFixed(1)}%)</div>
+        </div>
+    `;
+
+    if ((entity.hasShield || entity.type.hasShield) && entity.maxShield > 0) {
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Shield</div>
+                <div class="info-value">${Math.floor(entity.shield || 0).toLocaleString()} / ${Math.floor(entity.maxShield).toLocaleString()}</div>
+            </div>
+        `;
+    }
+
+    infoHTML += `
+        <div class="info-row">
+            <div class="info-label">Speed</div>
+            <div class="info-value">${entity.speed}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Size</div>
+            <div class="info-value">${entity.size}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Type</div>
+            <div class="info-value">${typeLabel}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Status Effects</div>
+            <div class="info-value">${statusEffects.length ? statusEffects.join(' | ') : 'None'}</div>
+        </div>
+    `;
+
+    if (entity.isCBaseSummon) {
+        const armada = entity.armadaPower ?? entity.potency ?? 0;
+        const armadaCapacity = entity.armadaCapacity || entity.type.armadaCapacity || 5;
+        const passiveTickAt = (entity.lastPassiveArmadaTick || entity.spawnTime || now) + 30000;
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Armada Power</div>
+                <div class="info-value">${armada} / ${armadaCapacity}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Passive AP</div>
+                <div class="info-value">${formatSeconds(passiveTickAt - now)}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Damage Surge</div>
+                <div class="info-value">${getCBaseSurgeText(entity, now)}</div>
+            </div>
+        `;
+
+        if (entity.cbaseUnitType === 'RESONATOR') {
+            const beamDamage = entity.resonatorBeamDamage || entity.type.orbBeamDamage;
+            const overheat = entity.resonatorOverheat || 0;
+            const orbCooldown = Math.max(0, (entity.resonatorOrbCooldownUntil || 0) - now);
+            const lockedTarget = entity.resonatorLockedTarget?.type?.name || entity.resonatorBigOrb?.target?.type?.name || 'None';
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Beam Damage</div>
+                    <div class="info-value">${beamDamage} x${entity.type.orbCount} (Max ${entity.type.orbBeamDamageMax} x${entity.type.orbCount})</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Overheat</div>
+                    <div class="info-value">${overheat} / ${entity.type.overheatCapacity}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Orb Cooldown</div>
+                    <div class="info-value">${orbCooldown > 0 ? formatSeconds(orbCooldown) : 'Ready'}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Target</div>
+                    <div class="info-value">${lockedTarget}</div>
+                </div>
+            `;
+        } else if (entity.cbaseUnitType === 'EXECUTIONER') {
+            const missileCd = Math.max(0, entity.type.missileCooldown - (now - (entity.lastMissile || 0)));
+            const blasterCd = entity.isBlasterActive ? 0 : Math.max(0, entity.type.blasterCooldown - (now - (entity.lastBlaster || 0)));
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Missiles</div>
+                    <div class="info-value">${entity.isMissilesActive ? 'Active' : missileCd > 0 ? formatSeconds(missileCd) : 'Ready'}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Blaster</div>
+                    <div class="info-value">${entity.isBlasterActive ? 'Active' : blasterCd > 0 ? formatSeconds(blasterCd) : 'Ready'}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Beam</div>
+                    <div class="info-value">${entity.beamUsed ? (entity.beamActive ? 'Active' : 'Spent') : `Ready (${entity.type.beamArmadaCost} AP)`}</div>
+                </div>
+            `;
+        } else if (entity.cbaseUnitType === 'CRUSADER') {
+            const spawnCd = Math.max(0, entity.type.spawnCooldown - (now - (entity.lastSpawnAbility || 0)));
+            const burstCd = entity.isBurstLaserActive ? 0 : Math.max(0, entity.type.burstLaserCooldown - (now - (entity.lastBurstLaser || 0)));
+            const strikeCd = entity.potencyStrikeActive ? 0 : Math.max(0, entity.type.potencyStrikeCooldown - (now - (entity.lastPotencyStrike || 0)));
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Spawn</div>
+                    <div class="info-value">${entity.spawnAbilityActive ? 'Active' : spawnCd > 0 ? formatSeconds(spawnCd) : `Ready (${entity.type.spawnArmadaCost} AP)`}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Burst Laser</div>
+                    <div class="info-value">${entity.isBurstLaserActive ? 'Active' : burstCd > 0 ? formatSeconds(burstCd) : `Ready (${entity.type.burstLaserArmadaCost} AP)`}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Strike</div>
+                    <div class="info-value">${entity.potencyStrikeActive ? 'Active' : strikeCd > 0 ? formatSeconds(strikeCd) : `Ready (${entity.type.potencyStrikeArmadaCost} AP)`}</div>
+                </div>
+            `;
+        }
+    }
+
+    if (entity.type.selfDestructDamage) {
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Self-Destruct</div>
+                <div class="info-value">${entity.type.selfDestructDamage.toLocaleString()} damage</div>
+            </div>
+        `;
+    }
+
+    infoHTML += `
+        <div class="info-row">
+            <div class="info-label">Distance</div>
+            <div class="info-value">${Math.floor(entity.distanceTraveled || 0)} px</div>
+        </div>
+    `;
+
+    towerInfoContent.innerHTML = infoHTML;
+    towerInfoPanel.style.display = 'block';
+}
+
 // Show tower info
 function showTowerInfo(tower) {
+    const panelTitle = document.querySelector('#towerInfoPanel .panel-header h3');
+    if (panelTitle) panelTitle.textContent = 'Tower Info';
     // Store the tower reference globally
     window.currentSelectedTower = tower;
     currentInfoTower = tower;
     lastTowerInfoUpdate = performance.now();
+
+    abilityTowerBtn.style.display = 'none';
+    ability2TowerBtn.style.display = 'none';
+    const mafiaTrapsBtn = document.getElementById('mafiaTrapsBtn');
+    if (mafiaTrapsBtn) mafiaTrapsBtn.style.display = 'none';
+    document.getElementById('carrierSpawnPanel').style.display = 'none';
 
     const level = tower.level;
     const type = tower.type;
@@ -920,8 +1466,79 @@ function showTowerInfo(tower) {
         </div>
     `;
 
+    if (isTowerStunned(tower)) {
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Status</div>
+                <div class="info-value" style="color:#F4FBFF;">Stunned ${(getTowerStunRemainingMs(tower) / 1000).toFixed(1)}s</div>
+            </div>
+        `;
+    }
+
     // Add stats based on tower type
-    if (type.support) {
+    if (type.isAgent) {
+        if (!tower.agent) initializeSpecialTowerState(tower);
+        const agent = tower.agent;
+        const stats = currentStats.abilities || {};
+        const hijackRemain = Math.max(0, (agentHijackUntil - performance.now()) / 1000);
+        const activeSweepers = agentSweeperEffects.filter(effect => waveNumber >= effect.startWave && waveNumber <= effect.endWave);
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Index Potency</div>
+                <div class="info-value">${agent.potency}/${currentStats.potencyCap || 10}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Stun</div>
+                <div class="info-value">${stats.stun ? `${(stats.stun.duration / 1000).toFixed(1)}s | ${getAgentCooldownRemaining(tower, 'stun').toFixed(1)}s CD` : 'Locked'}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Slowdown</div>
+                <div class="info-value">${stats.slowdown ? `${Math.round(stats.slowdown.amount * 100)}% for ${(stats.slowdown.duration / 1000).toFixed(1)}s` : 'Locked'}</div>
+            </div>
+        `;
+
+        if (stats.index) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Index</div>
+                    <div class="info-value">+$${stats.index.cashBonus} | +${Math.round(stats.index.damageVulnerability * 100)}% dmg | +${stats.index.potencyGain || 0} Pot</div>
+                </div>
+            `;
+        }
+        if (stats.hijack) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Hijack</div>
+                    <div class="info-value">${hijackRemain > 0 ? `Active ${hijackRemain.toFixed(1)}s` : `${(stats.hijack.duration / 1000).toFixed(1)}s summon block`}</div>
+                </div>
+            `;
+        }
+        if (stats.sweeper) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Sweeper</div>
+                    <div class="info-value">${Math.round(stats.sweeper.hpPercent * 100)}% over ${stats.sweeper.durationWaves} wave(s)${activeSweepers.length ? ` | ${activeSweepers.length} active` : ''}</div>
+                </div>
+            `;
+        }
+        if (stats.shieldBreaker) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Shield Breaker</div>
+                    <div class="info-value">${stats.shieldBreaker.shieldDamage.toLocaleString()} shield damage</div>
+                </div>
+            `;
+        }
+        if (stats.paralyzer) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Paralyzer</div>
+                    <div class="info-value">${Math.round(stats.paralyzer.slowAmount * 100)}% slow | -${Math.round(stats.paralyzer.resistanceDebuff * 100)}% res</div>
+                </div>
+            `;
+        }
+    } else if (type.support) {
         // Commander tower - show buff stats
         infoHTML += `
             <div class="info-row">
@@ -941,6 +1558,67 @@ function showTowerInfo(tower) {
                 <div class="info-value">${currentStats.range} tiles</div>
             </div>
         `;
+    } else if (type.isMafia && typeof get_mafia_info_html === 'function') {
+        // Mafia tower — custom detailed info panel
+        if (!tower.mafia) init_mafia_tower_state(tower);
+        infoHTML += get_mafia_info_html(tower);
+
+        // Setup ability buttons with labels and cooldown info
+        const stats = type.levels[level - 1];
+        const mState = tower.mafia || {};
+        const nowMs = performance.now();
+        if (stats.abilities) {
+            if (stats.abilities.bounty) {
+                abilityTowerBtn.style.display = 'inline-block';
+                const bountyCdRemain = Math.max(0, (stats.abilities.bounty.cooldown - (nowMs - (mState.lastBountyTime || 0))) / 1000);
+                abilityTowerBtn.textContent = bountyCdRemain > 0 ? `💰 Bounty [${bountyCdRemain.toFixed(1)}s]` : '💰 Bounty [Ready]';
+                abilityTowerBtn.onclick = () => activate_mafia_ability(tower, 'bounty');
+            } else {
+                abilityTowerBtn.style.display = 'none';
+            }
+
+            if (stats.abilities.target) {
+                ability2TowerBtn.style.display = 'inline-block';
+                const targetCdRemain = Math.max(0, (stats.abilities.target.cooldown - (nowMs - (mState.lastTargetTime || 0))) / 1000);
+                const targetBlocked = mState.targetAbilityEnemy && mState.targetAbilityEnemy.hp > 0;
+                if (targetBlocked) {
+                    ability2TowerBtn.textContent = '🎯 Target [Locked]';
+                } else {
+                    ability2TowerBtn.textContent = targetCdRemain > 0 ? `🎯 Target [${targetCdRemain.toFixed(1)}s]` : '🎯 Target [Ready]';
+                }
+                ability2TowerBtn.onclick = () => activate_mafia_ability(tower, 'target');
+            } else {
+                ability2TowerBtn.style.display = 'none';
+            }
+
+            // Traps — use a separate button
+            if (stats.abilities.traps) {
+                let trapsBtn = document.getElementById('mafiaTrapsBtn');
+                if (!trapsBtn) {
+                    trapsBtn = document.createElement('button');
+                    trapsBtn.id = 'mafiaTrapsBtn';
+                    trapsBtn.className = 'upgrade-btn';
+                    towerActions.appendChild(trapsBtn);
+                }
+                trapsBtn.style.display = 'inline-block';
+                const trapsCdRemain = Math.max(0, (stats.abilities.traps.cooldown - (nowMs - Math.max(mState.lastTrapsTime || 0, mafia_global_traps_cooldown || 0))) / 1000);
+                trapsBtn.textContent = trapsCdRemain > 0 ? `🪤 Traps [${trapsCdRemain.toFixed(1)}s]` : '🪤 Traps [Ready]';
+                trapsBtn.onclick = () => activate_mafia_ability(tower, 'traps');
+            }
+        } else {
+            abilityTowerBtn.style.display = 'none';
+            ability2TowerBtn.style.display = 'none';
+        }
+
+        // Hide traps btn for lower levels
+        if (!stats.abilities || !stats.abilities.traps) {
+            const trapsBtn = document.getElementById('mafiaTrapsBtn');
+            if (trapsBtn) trapsBtn.style.display = 'none';
+        }
+
+        // Hide carrier spawn UI
+        document.getElementById('carrierSpawnPanel').style.display = 'none';
+
     } else if (type.summons && currentStats.summons) {
         // --- Hybrid Tower Stat Block ---
         if (type.isHybrid) {
@@ -1199,6 +1877,218 @@ function showTowerInfo(tower) {
                 </div>
             `;
         }
+    } else if (type === TOWER_TYPES.COMMANDO) {
+        const buffs = getEffectiveTowerBuffs(tower, currentStats);
+        const goldenActive = (tower.goldenActiveUntil || 0) > performance.now();
+        const primaryBaseDamage = currentStats.damage * (goldenActive && currentStats.goldenDamageMultiplier ? currentStats.goldenDamageMultiplier : 1);
+        const primaryDamage = Math.floor(primaryBaseDamage * (1 + buffs.damageBoost));
+        const primaryBaseFireRate = goldenActive && currentStats.goldenPrimaryFireRate ? currentStats.goldenPrimaryFireRate : currentStats.fireRate;
+        const primaryFireRate = primaryBaseFireRate * (1 - buffs.fireRateBoost);
+        const buffedRange = currentStats.range + buffs.rangeBoost;
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">Primary</div>
+                <div class="info-value">${primaryDamage} ${currentStats.primaryDamageType || type.damageType}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Range</div>
+                <div class="info-value">${buffedRange}${buffs.rangeBoost > 0 ? ` (+${buffs.rangeBoost})` : ''} tiles</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Fire Rate</div>
+                <div class="info-value">${(primaryFireRate / 1000).toFixed(2)}s${buffs.fireRateBoost > 0 ? ` (-${(buffs.fireRateBoost * 100).toFixed(0)}%)` : ''}${goldenActive ? ' [Golden]' : ''}</div>
+            </div>
+        `;
+
+        if (currentStats.rocketDamage) {
+            const rocketDamage = Math.floor(currentStats.rocketDamage * (1 + buffs.damageBoost));
+            const rocketBaseFireRate = goldenActive && currentStats.goldenRocketFireRate ? currentStats.goldenRocketFireRate : currentStats.rocketFireRate;
+            const rocketFireRate = rocketBaseFireRate * (1 - buffs.fireRateBoost);
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Rockets</div>
+                    <div class="info-value">${rocketDamage} | ${(rocketFireRate / 1000).toFixed(2)}s | ${currentStats.rocketAOE}x${currentStats.rocketAOE}</div>
+                </div>
+            `;
+        }
+
+        if (currentStats.taserDamage) {
+            const taserDamage = Math.floor(currentStats.taserDamage * (1 + buffs.damageBoost));
+            const taserBaseFireRate = goldenActive && currentStats.goldenTaserFireRate ? currentStats.goldenTaserFireRate : currentStats.taserFireRate;
+            const taserFireRate = taserBaseFireRate * (1 - buffs.fireRateBoost);
+            const taserCd = Math.max(0, (taserFireRate - (performance.now() - (tower.lastTaserFired || 0))) / 1000);
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Taser</div>
+                    <div class="info-value">${taserDamage} laser | ${(taserFireRate / 1000).toFixed(1)}s | CD ${taserCd.toFixed(1)}s</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Passive</div>
+                    <div class="info-value">Boss stun stacks, -25% speed for 4s, -1s taser CD every 10 shots</div>
+                </div>
+            `;
+        }
+
+        if (currentStats.abilityCooldown) {
+            const goldenRemaining = Math.max(0, ((tower.goldenActiveUntil || 0) - performance.now()) / 1000);
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Ability</div>
+                    <div class="info-value">${goldenActive ? `Golden active ${goldenRemaining.toFixed(1)}s` : `Golden ready ($${currentStats.goldenActivationCost || 0})`}</div>
+                </div>
+            `;
+        }
+    } else if (type === TOWER_TYPES.LUNAR_CUBE) {
+        const bulletDps = ((currentStats.damage / currentStats.fireRate) * 1000).toFixed(1);
+        const laserDps = currentStats.laserDamage ? ((currentStats.laserDamage / currentStats.laserFireRate) * 1000).toFixed(1) : '0.0';
+        const mainGunLabel = currentStats.adaptiveMainGun ? 'Adaptive Main Gun' : 'Bullet';
+        const mainGunValue = currentStats.adaptiveMainGun ?
+            `${currentStats.damage} | ${(currentStats.fireRate / 1000).toFixed(2)}s | bullet -> laser -> piercing` :
+            `${currentStats.damage} | ${(currentStats.fireRate / 1000).toFixed(2)}s | ${bulletDps}/s`;
+
+        infoHTML += `
+            <div class="info-row">
+                <div class="info-label">${mainGunLabel}</div>
+                <div class="info-value">${mainGunValue}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Laser</div>
+                <div class="info-value">${currentStats.laserDamage} | ${(currentStats.laserFireRate / 1000).toFixed(2)}s | ${laserDps}/s</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Range</div>
+                <div class="info-value">${currentStats.range} tiles</div>
+            </div>
+        `;
+
+        if (currentStats.explosiveDamage) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Burst Bombs</div>
+                    <div class="info-value">${currentStats.explosiveDamage} x${currentStats.explosiveCount} | ${(currentStats.explosiveFireRate / 1000).toFixed(1)}s</div>
+                </div>
+            `;
+        }
+
+        if (currentStats.globalExplosionDamage) {
+            const globalCd = Math.max(0, (currentStats.globalExplosionFireRate - (performance.now() - (tower.lastLunarGlobalExplosion || 0))) / 1000);
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Moonfall</div>
+                    <div class="info-value">${currentStats.globalExplosionDamage} | ${currentStats.globalExplosionAOE}x${currentStats.globalExplosionAOE} | CD ${globalCd.toFixed(1)}s</div>
+                </div>
+            `;
+        }
+
+        if (currentStats.omegaDamage) {
+            const omegaCd = Math.max(0, (currentStats.omegaFireRate - (performance.now() - (tower.lastLunarOmega || 0))) / 1000);
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Omega Shot</div>
+                    <div class="info-value">${currentStats.omegaDamage} piercing | ${tower.lunarLaserShots || 0}/${currentStats.omegaLaserRequirement} laser charges | CD ${omegaCd.toFixed(1)}s</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-value" style="text-align:center; color:#FF6B6B;">âŒ Commander Buffs Disabled</div>
+                </div>
+            `;
+        }
+
+        if (currentStats.adaptiveMainGun) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Passive</div>
+                    <div class="info-value">30%+ bullet resist -> laser, 30%+ laser resist -> piercing</div>
+                </div>
+            `;
+        }
+    } else if (type === TOWER_TYPES.DRONE) {
+        let dmgMultiplier = 1;
+        if (typeof droneUnit !== 'undefined' && droneUnit) {
+            dmgMultiplier = 1 + droneUnit.dmgBuffStack + droneUnit.killBuffStack + (droneUnit.bountyBuffStack || 0) + (droneUnit.bountyDebuffStack || 0);
+        }
+
+        const minigunDps = currentStats.minigunDamage ? Math.floor(currentStats.minigunDamage * dmgMultiplier * (1000 / currentStats.minigunFireRate)) : 0;
+
+        infoHTML += `
+            <div class="info-row"><div class="info-label" style="color: #00FA9A;">Abilities & Stats</div><div class="info-value"></div></div>
+        `;
+
+        // Helper specifically for Drone ability reloading/cooldowns
+        const now = performance.now();
+
+        if (currentStats.minigunDamage) {
+            let mgAmmoDisplay = `${droneUnit ? droneUnit.minigunAmmo : currentStats.minigunAmmo}/${currentStats.minigunAmmo}`;
+            if (droneUnit && droneUnit.minigunReloading) {
+                const elapsed = now - droneUnit.minigunReloadStartTime;
+                const remain = Math.max(0, (currentStats.minigunReloadTime - elapsed) / 1000).toFixed(1);
+                mgAmmoDisplay = `<span style="color:red">Reloading ${remain}s</span>`;
+            }
+
+            infoHTML += `
+            <div class="info-row" style="margin-left: 10px;">
+                <div class="info-label">[1] Minigun DPS</div>
+                <div class="info-value">${minigunDps} (Ammo: ${mgAmmoDisplay})</div>
+            </div>`;
+        }
+        if (currentStats.rocketDamage) {
+            const rocketDps = Math.floor(currentStats.rocketDamage * dmgMultiplier * (1000 / currentStats.rocketFireRate));
+
+            let rkAmmoDisplay = `${droneUnit ? droneUnit.rocketAmmo : currentStats.rocketAmmo}/${currentStats.rocketAmmo}`;
+            if (droneUnit && droneUnit.rocketReloading) {
+                const elapsed = now - droneUnit.rocketReloadStartTime;
+                const remain = Math.max(0, (currentStats.rocketReloadTime - elapsed) / 1000).toFixed(1);
+                rkAmmoDisplay = `<span style="color:red">Reloading ${remain}s</span>`;
+            }
+
+            infoHTML += `
+            <div class="info-row" style="margin-left: 10px;">
+                <div class="info-label">[2] Rocket DPS</div>
+                <div class="info-value">${rocketDps} (Ammo: ${rkAmmoDisplay})</div>
+            </div>`;
+        }
+        if (currentStats.laserDamage) {
+            const laserDps = Math.floor(currentStats.laserDamage * dmgMultiplier * (1000 / currentStats.laserTickRate));
+            let laserStatus = "Ready";
+            if (droneUnit) {
+                if (droneUnit.laserActive) {
+                    const elapsed = now - droneUnit.laserStartTime;
+                    laserStatus = `<span style="color:#00ffff">Active ${Math.max(0, (currentStats.laserDuration - elapsed) / 1000).toFixed(1)}s</span>`;
+                } else if (now - droneUnit.laserCooldownStartTime < currentStats.laserCooldown) {
+                    const remain = Math.max(0, (currentStats.laserCooldown - (now - droneUnit.laserCooldownStartTime)) / 1000).toFixed(1);
+                    laserStatus = `<span style="color:#ffaa00">CD: ${remain}s</span>`;
+                }
+            }
+
+            infoHTML += `
+            <div class="info-row" style="margin-left: 10px;">
+                <div class="info-label">[3] Laser DPS</div>
+                <div class="info-value">${laserDps} (${laserStatus})</div>
+            </div>`;
+        }
+        if (currentStats.sightBuffAmount) {
+            let sightStatus = "Ready";
+            if (droneUnit && now - droneUnit.lastSightTime < currentStats.sightCooldown) {
+                const remain = Math.max(0, (currentStats.sightCooldown - (now - droneUnit.lastSightTime)) / 1000).toFixed(1);
+                sightStatus = `<span style="color:#ffaa00">CD: ${remain}s</span>`;
+            }
+
+            infoHTML += `
+            <div class="info-row" style="margin-left: 10px;">
+                <div class="info-label">[4] Sight</div>
+                <div class="info-value">+10% dmg debuff (${sightStatus})</div>
+            </div>`;
+        }
+
+        infoHTML += `
+            <div class="info-row" style="margin-top: 5px;">
+                <div class="info-label" style="color: yellow;">Global Buff Mtp.</div>
+                <div class="info-value">x${dmgMultiplier.toFixed(2)}</div>
+            </div>
+            <div class="info-row" style="margin-top: 5px; font-size: 11px; color: #888; text-align:center;">
+                Use W A S D to move the Drone
+            </div>
+        `;
     } else {
         // Get Commander buffs
         const buffs = getCommanderBuffs(tower);
@@ -1279,6 +2169,13 @@ function showTowerInfo(tower) {
                     <div class="info-value">DMG: ${damageDisplay}, Range: ${nextStats.range}</div>
                 </div>
             `;
+        } else if (type.isAgent) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Next Level</div>
+                    <div class="info-value">Unlocks stronger control tools${nextStats.abilities?.index ? ' + Index' : ''}${nextStats.abilities?.hijack ? ' + Hijack' : ''}${nextStats.abilities?.sweeper ? ' + Sweeper' : ''}${nextStats.abilities?.shieldBreaker ? ' + Shield Breaker' : ''}${nextStats.abilities?.paralyzer ? ' + Paralyzer' : ''}</div>
+                </div>
+            `;
         } else {
             infoHTML += `
                 <div class="info-row">
@@ -1331,6 +2228,7 @@ function showTowerInfo(tower) {
     }
 
     sellTowerBtn.textContent = `💰 Sell ($${Math.floor(type.cost * 0.6 * (level / 2))})`;
+    sellTowerBtn.style.display = 'inline-block';
 
     // Show ability button for Elite Spawner level 5
     if (type === TOWER_TYPES.ELITE_SPAWNER && level === 5) {
@@ -1372,6 +2270,28 @@ function showTowerInfo(tower) {
             abilityTowerBtn.style.display = 'block';
         }
         ability2TowerBtn.style.display = 'none'; // Hide second ability button
+    } else if (type === TOWER_TYPES.COMMANDO && level === 5) {
+        const goldenRemaining = Math.max(0, ((tower.goldenActiveUntil || 0) - performance.now()) / 1000);
+        const cooldownRemaining = Math.max(0, (currentStats.abilityCooldown - (performance.now() - (tower.lastGoldenTime || 0))) / 1000);
+
+        if (goldenRemaining > 0) {
+            abilityTowerBtn.textContent = `Golden Commando (${goldenRemaining.toFixed(1)}s)`;
+            abilityTowerBtn.disabled = true;
+            abilityTowerBtn.style.display = 'block';
+        } else if (cooldownRemaining > 0) {
+            abilityTowerBtn.textContent = `Golden Commando (${cooldownRemaining.toFixed(1)}s)`;
+            abilityTowerBtn.disabled = true;
+            abilityTowerBtn.style.display = 'block';
+        } else if (cash < (currentStats.goldenActivationCost || 0)) {
+            abilityTowerBtn.textContent = `Golden Commando ($${currentStats.goldenActivationCost || 0})`;
+            abilityTowerBtn.disabled = true;
+            abilityTowerBtn.style.display = 'block';
+        } else {
+            abilityTowerBtn.textContent = `Golden Commando ($${currentStats.goldenActivationCost || 0})`;
+            abilityTowerBtn.disabled = false;
+            abilityTowerBtn.style.display = 'block';
+        }
+        ability2TowerBtn.style.display = 'none';
     } else if (type === TOWER_TYPES.GUNNER_PARAGON && level >= 2) {
         // Paragon Alpha Protocol ability (Radian 2+)
         const alphaCost = type.alphaCost;
@@ -1416,7 +2336,6 @@ function showTowerInfo(tower) {
         } else {
             ability2TowerBtn.style.display = 'none';
         }
-        ability2TowerBtn.style.display = 'none';
     } else if (type.isCarrier) {
         // Carrier Cube UI - Show efficiency modules and per-unit states
         const em = tower.em || 0;
@@ -1487,15 +2406,26 @@ function showTowerInfo(tower) {
 
         // Show separate spawn UI
         showCarrierSpawnUI(tower);
+    } else if (type.isAgent) {
+        abilityTowerBtn.style.display = 'none';
+        ability2TowerBtn.style.display = 'none';
+        showAgentAbilityUI(tower);
+    } else if (type.isMafia) {
+        // Do nothing, Mafia buttons are already handled in the HTML generation phase
     } else {
         abilityTowerBtn.style.display = 'none';
         ability2TowerBtn.style.display = 'none';
+        const trapsBtn = document.getElementById('mafiaTrapsBtn');
+        if (trapsBtn) trapsBtn.style.display = 'none';
         // Hide separate spawn UI if not carrier
         document.getElementById('carrierSpawnPanel').style.display = 'none';
     }
 
-    // Show the panel and buttons
+    // Show the panel with slide-in animation
     towerInfoPanel.style.display = 'flex';
+    towerInfoPanel.classList.add('panel-hidden');
+    void towerInfoPanel.offsetWidth; // force reflow
+    towerInfoPanel.classList.remove('panel-hidden');
     towerActions.style.display = 'block';
 
     // Store selected tower for timer display
@@ -1507,6 +2437,9 @@ function showCarrierSpawnUI(tower) {
     const panel = document.getElementById('carrierSpawnPanel');
     const container = document.getElementById('carrierUnitsGrid');
     if (!panel || !container) return;
+
+    const headerTitle = panel.querySelector('.panel-header h3');
+    if (headerTitle) headerTitle.textContent = 'Carrier Units';
 
     // Clean up any existing tooltips before creating new ones
     document.querySelectorAll('.carrier-tooltip').forEach(t => t.remove());
@@ -1527,6 +2460,7 @@ function showCarrierSpawnUI(tower) {
     }
 
     const currentEM = tower.em || 0;
+    const towerDisabled = isTowerStunned(tower);
     const levelStats = tower.type.levels[tower.level - 1];
     const maxEM = levelStats.emCap || tower.type.efficiencyCap || 20;
     const emPercent = Math.min(100, (currentEM / maxEM) * 100);
@@ -1546,6 +2480,7 @@ function showCarrierSpawnUI(tower) {
                 transition: width 0.3s ease;
             "></div>
         </div>
+        ${towerDisabled ? `<div style="margin-top:8px; color:#F4FBFF; font-size:11px; text-align:center;">Stunned for ${(getTowerStunRemainingMs(tower) / 1000).toFixed(1)}s</div>` : ''}
     `;
 
     const units = [CARRIER_UNITS.BOMBER, CARRIER_UNITS.BLISMA];
@@ -1593,10 +2528,13 @@ function showCarrierSpawnUI(tower) {
         const limit = unit.limit || 2;
         const hardLimit = unit.hardLimit || 3;
 
-        btn.disabled = !canAfford || isPayback;
+        btn.disabled = !canAfford || isPayback || towerDisabled;
         if (isPayback) {
             btn.style.opacity = '0.4';
             btn.style.border = '2px solid #ff0000';
+        } else if (towerDisabled) {
+            btn.style.opacity = '0.45';
+            btn.style.border = '2px solid #d9efff';
         } else if (isFullCooldown) {
             btn.style.opacity = '0.7';
             btn.style.border = '2px solid #ff6600';
@@ -1759,6 +2697,338 @@ function showCarrierSpawnUI(tower) {
     // Keep only the newly created tooltips (already handled in forEach)
 }
 
+function getAgentAbilityLabel(key) {
+    const labels = {
+        stun: 'Stun',
+        slowdown: 'Slowdown',
+        index: 'Index',
+        hijack: 'Hijack',
+        sweeper: 'Sweeper',
+        shieldBreaker: 'Shield Breaker',
+        paralyzer: 'Paralyzer'
+    };
+    return labels[key] || key;
+}
+
+function getAgentCooldownRemaining(tower, abilityKey, timestamp = performance.now()) {
+    const stats = tower.type.levels[tower.level - 1];
+    const ability = stats.abilities?.[abilityKey];
+    if (!ability || !tower.agent) return 0;
+    const lastKey = `last${abilityKey.charAt(0).toUpperCase()}${abilityKey.slice(1)}Time`;
+    return Math.max(0, (ability.cooldown - (timestamp - (tower.agent[lastKey] || -Infinity))) / 1000);
+}
+
+function startAgentTargeting(tower, abilityKey) {
+    agentTargetingActive = true;
+    agentTargetingData = { tower, abilityKey };
+    canvas.style.cursor = 'crosshair';
+    towerInfoPanel.style.display = 'none';
+    document.getElementById('carrierSpawnPanel').style.display = 'none';
+}
+
+function cancelAgentTargeting() {
+    agentTargetingActive = false;
+    agentTargetingData = null;
+    canvas.style.cursor = 'default';
+    if (typeof showTowerInfo === 'function' && window.currentInfoTower) {
+        showTowerInfo(window.currentInfoTower);
+    }
+}
+
+function addAgentSlowEffect(enemy, amount, duration, timestamp) {
+    if (!enemy.agentSlowEffects) enemy.agentSlowEffects = [];
+    enemy.agentSlowEffects.push({ amount, until: timestamp + duration });
+}
+
+function getAgentSlowMultiplier(enemy, timestamp) {
+    if (!enemy.agentSlowEffects || enemy.agentSlowEffects.length === 0) return 1;
+    enemy.agentSlowEffects = enemy.agentSlowEffects.filter(effect => effect.until > timestamp);
+    if (enemy.agentSlowEffects.length === 0) return 1;
+    const strongestSlow = Math.max(...enemy.agentSlowEffects.map(effect => effect.amount || 0));
+    return 1 - strongestSlow;
+}
+
+function getAgentAdjustedResistance(baseValue, enemy, timestamp = performance.now()) {
+    if (baseValue <= 0) return baseValue;
+    if ((enemy.agentResistDebuffUntil || 0) <= timestamp) return baseValue;
+    return Math.max(0, baseValue - (enemy.agentResistDebuffAmount || 0));
+}
+
+function getAgentIndexVulnerability(enemy) {
+    if (!enemy._agentIndexMarks || enemy._agentIndexMarks.length === 0) return 0;
+    return Math.max(...enemy._agentIndexMarks.map(mark => mark.damageVulnerability || 0), 0);
+}
+
+function processAgentIndexKill(enemy) {
+    if (!enemy._agentIndexMarks || enemy._agentIndexMarks.length === 0) return;
+    enemy._agentIndexMarks.forEach(mark => {
+        if (mark.cashBonus) cash += mark.cashBonus;
+        if (mark.tower?.agent && mark.potencyGain) {
+            const cap = mark.tower.type.levels[mark.tower.level - 1].potencyCap || 10;
+            mark.tower.agent.potency = Math.min(cap, (mark.tower.agent.potency || 0) + mark.potencyGain);
+        }
+    });
+    enemy._agentIndexMarks = [];
+}
+
+function isAgentHijackBlocked(entity) {
+    if (performance.now() >= agentHijackUntil) return false;
+    if (agentHijackMode === 'all') return !!entity.type.isSummoner;
+    if (agentHijackMode === 'necromancer') {
+        return entity.type.summonType === 'nmsummon_nm' || entity.type.summonType === 'nmsummon2_nm';
+    }
+    return false;
+}
+
+function applyAgentSweeperToEnemy(enemy, waveNum = waveNumber) {
+    if (enemy.isSummon) return;
+    if (!enemy._agentSweeperApplied) enemy._agentSweeperApplied = {};
+
+    agentSweeperEffects.forEach(effect => {
+        if (waveNum < effect.startWave || waveNum > effect.endWave) return;
+        if (enemy._agentSweeperApplied[effect.id]) return;
+        if (effect.affectsHpBarOnlyFalse && enemy.type.showHpBar) return;
+
+        enemy.hp = Math.max(0, enemy.hp - enemy.maxHp * effect.hpPercent);
+        if (effect.affectsShield && enemy.shield > 0) {
+            enemy.shield = Math.max(0, enemy.shield - (enemy.maxShield || enemy.shield) * effect.hpPercent);
+        }
+        enemy._agentSweeperApplied[effect.id] = true;
+    });
+}
+
+function activateAgentAbility(tower, abilityKey) {
+    if (!tower || tower.type !== TOWER_TYPES.AGENT || !tower.agent) return;
+    if (isTowerStunned(tower)) return;
+    const stats = tower.type.levels[tower.level - 1];
+    const ability = stats.abilities?.[abilityKey];
+    if (!ability) return;
+
+    const cooldownRemaining = getAgentCooldownRemaining(tower, abilityKey, performance.now());
+    if (cooldownRemaining > 0) return;
+
+    const potencyCost = ability.potencyCost || 0;
+    if ((tower.agent.potency || 0) < potencyCost) return;
+
+    if (ability.targeted) {
+        startAgentTargeting(tower, abilityKey);
+        return;
+    }
+
+    const now = performance.now();
+    const lastKey = `last${abilityKey.charAt(0).toUpperCase()}${abilityKey.slice(1)}Time`;
+
+    if (abilityKey === 'hijack') {
+        agentHijackUntil = now + ability.duration;
+        agentHijackMode = ability.mode;
+    } else if (abilityKey === 'sweeper') {
+        const startWave = waveActive ? Math.max(1, waveNumber) : waveNumber + 1;
+        const effect = {
+            id: nextAgentSweeperId++,
+            startWave,
+            endWave: startWave + ability.durationWaves - 1,
+            hpPercent: ability.hpPercent,
+            affectsHpBarOnlyFalse: !!ability.affectsHpBarOnlyFalse,
+            affectsShield: !!ability.affectsShield
+        };
+        agentSweeperEffects.push(effect);
+        enemies.forEach(enemy => applyAgentSweeperToEnemy(enemy, waveNumber));
+    } else if (abilityKey === 'shieldBreaker') {
+        enemies.forEach(enemy => {
+            if (!enemy.isSummon && enemy.shield > 0) {
+                enemy.shield = Math.max(0, enemy.shield - ability.shieldDamage);
+            }
+        });
+    }
+
+    if (potencyCost) {
+        tower.agent.potency = Math.max(0, (tower.agent.potency || 0) - potencyCost);
+    }
+    tower.agent[lastKey] = now;
+    if (currentInfoTower === tower) showTowerInfo(tower);
+}
+
+function executeAgentTargetedAbility(enemy) {
+    if (!agentTargetingData || !enemy) return;
+
+    const { tower, abilityKey } = agentTargetingData;
+    if (!tower || !towers.includes(tower) || tower.type !== TOWER_TYPES.AGENT || !tower.agent) {
+        cancelAgentTargeting();
+        return;
+    }
+    if (isTowerStunned(tower)) {
+        cancelAgentTargeting();
+        return;
+    }
+
+    const stats = tower.type.levels[tower.level - 1];
+    const ability = stats.abilities?.[abilityKey];
+    if (!ability) {
+        cancelAgentTargeting();
+        return;
+    }
+
+    const cooldownRemaining = getAgentCooldownRemaining(tower, abilityKey, performance.now());
+    if (cooldownRemaining > 0) {
+        cancelAgentTargeting();
+        return;
+    }
+
+    const potencyCost = ability.potencyCost || 0;
+    if ((tower.agent.potency || 0) < potencyCost) {
+        cancelAgentTargeting();
+        return;
+    }
+
+    const now = performance.now();
+    const lastKey = `last${abilityKey.charAt(0).toUpperCase()}${abilityKey.slice(1)}Time`;
+
+    if (abilityKey === 'stun') {
+        enemy.agentStunUntil = Math.max(enemy.agentStunUntil || now, now + ability.duration);
+    } else if (abilityKey === 'slowdown') {
+        addAgentSlowEffect(enemy, ability.amount, ability.duration, now);
+    } else if (abilityKey === 'index') {
+        if (!enemy._agentIndexMarks) enemy._agentIndexMarks = [];
+        enemy._agentIndexMarks = enemy._agentIndexMarks.filter(mark => mark.tower !== tower);
+        enemy._agentIndexMarks.push({
+            tower,
+            cashBonus: ability.cashBonus,
+            damageVulnerability: ability.damageVulnerability,
+            potencyGain: ability.potencyGain || 0
+        });
+    } else if (abilityKey === 'paralyzer') {
+        enemy.agentStunUntil = Math.max(enemy.agentStunUntil || now, now + ability.stunDuration);
+        addAgentSlowEffect(enemy, ability.slowAmount, ability.slowDuration, now);
+        enemy.agentResistDebuffUntil = Math.max(enemy.agentResistDebuffUntil || now, now + ability.duration);
+        enemy.agentResistDebuffAmount = Math.max(enemy.agentResistDebuffAmount || 0, ability.resistanceDebuff || 0);
+    }
+
+    if (potencyCost) {
+        tower.agent.potency = Math.max(0, (tower.agent.potency || 0) - potencyCost);
+    }
+    tower.agent[lastKey] = now;
+    cancelAgentTargeting();
+}
+
+function showAgentAbilityUI(tower) {
+    const panel = document.getElementById('carrierSpawnPanel');
+    const container = document.getElementById('carrierUnitsGrid');
+    if (!panel || !container) return;
+
+    const headerTitle = panel.querySelector('.panel-header h3');
+    if (headerTitle) headerTitle.textContent = 'Agent Toolkit';
+
+    panel.style.display = 'block';
+    container.innerHTML = '';
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    container.style.gap = '8px';
+    container.style.marginTop = '10px';
+
+    let emcBar = document.getElementById('emcProgressBar');
+    if (!emcBar) {
+        emcBar = document.createElement('div');
+        emcBar.id = 'emcProgressBar';
+        panel.insertBefore(emcBar, container);
+    }
+
+    const stats = tower.type.levels[tower.level - 1];
+    const potencyCap = stats.potencyCap || 10;
+    const potency = tower.agent?.potency || 0;
+    const potencyPercent = Math.min(100, (potency / potencyCap) * 100);
+    emcBar.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:12px; color:#9EE7E7; font-weight:bold;">Index Potency</span>
+            <span style="font-size:14px; color:#FFFFFF; font-weight:bold;">${potency}/${potencyCap}</span>
+        </div>
+        <div style="width:100%; height:10px; background:rgba(0,0,0,0.5); border-radius:5px; overflow:hidden; border:1px solid rgba(158,231,231,0.4);">
+            <div style="width:${potencyPercent}%; height:100%; background:linear-gradient(90deg, #4dd2ff, #9EE7E7); transition:width 0.3s ease;"></div>
+        </div>
+    `;
+
+    const abilityOrder = ['stun', 'slowdown', 'index', 'hijack', 'sweeper', 'shieldBreaker', 'paralyzer'];
+    abilityOrder.forEach(key => {
+        const ability = stats.abilities?.[key];
+        if (!ability) return;
+
+        const cooldownRemaining = getAgentCooldownRemaining(tower, key);
+        const potencyCost = ability.potencyCost || 0;
+        const canAffordPotency = (tower.agent?.potency || 0) >= potencyCost;
+        const isReady = cooldownRemaining <= 0 && canAffordPotency;
+
+        const btn = document.createElement('button');
+        btn.className = 'carrier-unit-btn';
+        btn.style.cssText = `
+            font-size: 11px;
+            padding: 8px 5px;
+            background: linear-gradient(135deg, rgba(47,79,79,0.95) 0%, rgba(94,117,117,0.95) 100%);
+            border: 2px solid ${isReady ? '#9EE7E7' : '#555'};
+            border-radius: 8px;
+            color: #fff;
+            min-height: 76px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: ${isReady ? 'pointer' : 'default'};
+            opacity: ${isReady ? '1' : '0.65'};
+        `;
+        btn.disabled = !isReady;
+
+        let infoText = '';
+        if (key === 'stun') infoText = `${(ability.duration / 1000).toFixed(1)}s stun`;
+        else if (key === 'slowdown') infoText = `${Math.round(ability.amount * 100)}% slow`;
+        else if (key === 'index') infoText = `+$${ability.cashBonus} | +${Math.round(ability.damageVulnerability * 100)}% dmg`;
+        else if (key === 'hijack') infoText = `${(ability.duration / 1000).toFixed(1)}s summon block`;
+        else if (key === 'sweeper') infoText = `${Math.round(ability.hpPercent * 100)}% hp for ${ability.durationWaves} waves`;
+        else if (key === 'shieldBreaker') infoText = `${ability.shieldDamage.toLocaleString()} shield dmg`;
+        else if (key === 'paralyzer') infoText = `${(ability.stunDuration / 1000).toFixed(1)}s stun | -10% res`;
+
+        const statusText = cooldownRemaining > 0 ? `CD ${cooldownRemaining.toFixed(1)}s` : (potencyCost > 0 ? `${potencyCost} Pot` : 'Ready');
+        btn.innerHTML = `
+            <div style="font-weight:bold; color:#9EE7E7;">${getAgentAbilityLabel(key)}</div>
+            <div style="font-size:10px; text-align:center;">${infoText}</div>
+            <div style="font-size:10px; color:${cooldownRemaining > 0 ? '#FFCC00' : (canAffordPotency ? '#A8FFB0' : '#FF8080')};">${statusText}</div>
+        `;
+        btn.onclick = () => activateAgentAbility(tower, key);
+        container.appendChild(btn);
+    });
+}
+
+function initializeSpecialTowerState(tower) {
+    if (tower.type === TOWER_TYPES.AGENT) {
+        if (!tower.agent) {
+            tower.agent = {
+                potency: 0,
+                lastStunTime: -Infinity,
+                lastSlowdownTime: -Infinity,
+                lastIndexTime: -Infinity,
+                lastHijackTime: -Infinity,
+                lastSweeperTime: -Infinity,
+                lastShieldBreakerTime: -Infinity,
+                lastParalyzerTime: -Infinity
+            };
+        }
+    } else if (tower.type === TOWER_TYPES.COMMANDO) {
+        if (tower.lastRocketFired === undefined) tower.lastRocketFired = -Infinity;
+        if (tower.lastTaserFired === undefined) tower.lastTaserFired = -Infinity;
+        tower.commandoShotCount = tower.commandoShotCount || 0;
+        if (tower.lastGoldenTime === undefined) tower.lastGoldenTime = -Infinity;
+        if (tower.goldenActiveUntil === undefined) tower.goldenActiveUntil = 0;
+        if (tower.goldenCashDrainUntil === undefined) tower.goldenCashDrainUntil = 0;
+    } else if (tower.type === TOWER_TYPES.LUNAR_CUBE) {
+        if (tower.lastLunarLaser === undefined) tower.lastLunarLaser = -Infinity;
+        if (tower.lastLunarExplosive === undefined) tower.lastLunarExplosive = -Infinity;
+        if (tower.lastLunarGlobalExplosion === undefined) tower.lastLunarGlobalExplosion = -Infinity;
+        if (tower.lastLunarOmega === undefined) tower.lastLunarOmega = -Infinity;
+        tower.lunarLaserShots = tower.lunarLaserShots || 0;
+        tower.lunarCharging = tower.lunarCharging || false;
+        tower.lunarChargeStart = tower.lunarChargeStart || 0;
+        tower.lunarChargeTarget = tower.lunarChargeTarget || null;
+    }
+}
+
 
 // Sell tower
 function sellTower(tower) {
@@ -1794,6 +3064,8 @@ function sellTower(tower) {
         eliteSpawnerCount--;
     } else if (tower.type === TOWER_TYPES.FARM) {
         farmCount--;
+    } else if (tower.type === TOWER_TYPES.DRONE) {
+        if (typeof clearDroneUnits === 'function') clearDroneUnits();
     }
 
     // Remove the tower from the global towers array
@@ -1992,6 +3264,8 @@ function upgradeTower(tower) {
         }
         tower.level++;
         tower.lastSummonTimes = {}; // Reset individual summon timers on upgrade
+        initializeSpecialTowerState(tower);
+        window.sfxUpgrade();
 
         // Instant spawn for Cube Factory on upgrade
         if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
@@ -2026,7 +3300,9 @@ function upgradeTower(tower) {
         }
 
         updateCashDisplay();
-        showTowerInfo(tower);
+        if (!window.currentSelectedTower) {
+            showTowerInfo(tower);
+        }
     }
 }
 
@@ -2054,6 +3330,8 @@ function placeTower(gridX, gridY) {
         towerSizeX = 3; towerSizeY = 3;
     } else if (selectedTower === TOWER_TYPES.CARRIER_CUBE) {
         towerSizeX = 4; towerSizeY = 4;
+    } else if (selectedTower === TOWER_TYPES.CBASE) {
+        towerSizeX = 5; towerSizeY = 5;
     }
 
     // --- STEP 1: Global Tower Limit Check ---
@@ -2109,7 +3387,14 @@ function placeTower(gridX, gridY) {
         lastDamageDealt: 0,
         lastDamageTime: 0
     };
+    initializeSpecialTowerState(tower);
     towers.push(tower);
+
+    if (tower.type === TOWER_TYPES.DRONE) {
+        if (typeof spawnDrone === 'function') {
+            spawnDrone(tower);
+        }
+    }
 
     // Occupy grid cells for multi-grid towers
     for (let y = gridY; y < gridY + towerSizeY; y++) {
@@ -2149,6 +3434,7 @@ function placeTower(gridX, gridY) {
 
     cash -= selectedTowerCost; // Use selectedTowerCost as it includes dynamic pricing
     updateCashDisplay();
+    window.sfxPlace();
     selectedTower = null;
     selectedTowerCost = 0;
     updateTowerSelection(); // Update selection visual to remove 'selected' class
@@ -2162,7 +3448,7 @@ function getCommanderBuffs(tower) {
     let damageBoost = 0;
 
     // Find all Commander towers
-    const commanders = towers.filter(t => t.type === TOWER_TYPES.COMMANDER);
+    const commanders = towers.filter(t => t.type === TOWER_TYPES.COMMANDER && !isTowerStunned(t));
 
     for (const commander of commanders) {
         const commanderStats = commander.type.levels[commander.level - 1];
@@ -2357,6 +3643,10 @@ function updateOrbitalStrike(timestamp) {
         orbitalStrikeData.clusterTicks = 0;
         orbitalStrikeData.lastClusterTime = timestamp;
 
+        // SCREEN SHAKE + SFX
+        window.triggerShake(18, 700);
+        window.sfxOrbitalImpact();
+
         // Create massive explosion effect
         explosions.push({
             x: orbitalStrikeData.x,
@@ -2490,6 +3780,28 @@ function triggerOrbitalStrike(tower) {
     }
 }
 
+function triggerGoldenCommando(tower) {
+    if (tower.type !== TOWER_TYPES.COMMANDO || tower.level !== 5) return;
+
+    const stats = tower.type.levels[tower.level - 1];
+    const now = performance.now();
+    const timeSinceLastUse = now - (tower.lastGoldenTime || 0);
+
+    if (timeSinceLastUse < stats.abilityCooldown || (tower.goldenActiveUntil || 0) > now) {
+        return;
+    }
+
+    const upfrontCost = stats.goldenActivationCost || 0;
+    if (cash < upfrontCost) return;
+
+    cash -= upfrontCost;
+    tower.lastGoldenTime = now;
+    tower.goldenActiveUntil = now + (stats.goldenDuration || 0);
+    tower.goldenCashDrainUntil = now + (stats.goldenCashDrainDuration || 0);
+    updateCashDisplay();
+    showTowerInfo(tower);
+}
+
 // Trigger Paragon Alpha ability
 function triggerParagonAlpha(tower) {
     if (tower.type === TOWER_TYPES.GUNNER_PARAGON && tower.level >= 2) {
@@ -2502,7 +3814,7 @@ function triggerParagonAlpha(tower) {
             const baseHpBonus = stats.baseHp;  // Get the passive bonus (400 or 900)
             const originalHp = BASE_HP + baseHpBonus;  // 100 + 400/900
 
-            baseHp = 10000;  // Set to exactly 10,000
+            baseHp = 100000;  // Set to exactly 100,000
             baseHpDisplay.textContent = baseHp;
 
             // Restore original HP after 15 seconds
@@ -2515,7 +3827,7 @@ function triggerParagonAlpha(tower) {
             tower.lastAlphaTime = performance.now();
             updateCashDisplay();
             showTowerInfo(tower);
-            console.log(`Alpha Protocol activated! Base HP set to 10,000 for 15 seconds!`);
+            console.log(`Alpha Protocol activated! Base HP set to 100,000 for 15 seconds!`);
         }
     }
 }
@@ -2594,7 +3906,18 @@ function triggerParagonBeta(tower) {
 function startNextWave() {
     if (!waveActive) {
         waveNumber++;
+        agentSweeperEffects = agentSweeperEffects.filter(effect => waveNumber <= effect.endWave);
         waveDisplay.textContent = waveNumber;
+        // Wave number HUD pop
+        waveDisplay.classList.remove('hud-pop');
+        void waveDisplay.offsetWidth;
+        waveDisplay.classList.add('hud-pop');
+        // Banner + sound
+        showWaveBanner(waveNumber);
+        window.sfxWaveStart();
+        if (isNightmareModeActive() && secretWaveState.activated && waveNumber === 50) {
+            startSecretWaveBossMusic();
+        }
         spawnWave();
         waveActive = true;
         waveTimer = 0;
@@ -2638,6 +3961,7 @@ function skipWave() {
 function generateFarmCash() {
     towers.forEach(tower => {
         if (tower.type.farm) {
+            if (isTowerStunned(tower)) return;
             const cashAmount = tower.type.levels[tower.level - 1].cashPerWave;
             cash += cashAmount;
             const effect = { x: tower.x, y: tower.y - 10, text: `+$${cashAmount}`, alpha: 1, time: 0 };
@@ -2696,6 +4020,7 @@ function processWaveGroup(wave) {
 function spawnWave() {
     // Get the correct wave array based on game mode
     let currentWaves;
+    let secretWaveData = null;
     if (currentGameMode === GAME_MODES.NORMAL) {
         currentWaves = NORMAL_WAVES;
     } else if (currentGameMode === GAME_MODES.HARDMODE) {
@@ -2719,6 +4044,13 @@ function spawnWave() {
             window.NIGHTMARE_WAVES = generateNightmareWaves();
         }
         currentWaves = window.NIGHTMARE_WAVES;
+        if (secretWaveState.activated) {
+            const secretWaves = getSecretWaveList();
+            const secretIndex = waveNumber - SECRET_WAVE_START;
+            if (secretIndex >= 0 && secretIndex < secretWaves.length) {
+                secretWaveData = secretWaves[secretIndex];
+            }
+        }
         console.log("Nightmare Waves loaded:", currentWaves ? currentWaves.length : 0);
     } else {
         currentWaves = NORMAL_WAVES; // Fallback
@@ -2727,7 +4059,9 @@ function spawnWave() {
     let waveData;
 
     // Generate regular wave enemies
-    if (waveNumber <= currentWaves.length) {
+    if (secretWaveData) {
+        waveData = secretWaveData;
+    } else if (waveNumber <= currentWaves.length) {
         waveData = currentWaves[waveNumber - 1];
     } else {
         // For endless mode or waves beyond defined ones, generate procedural waves
@@ -2836,11 +4170,31 @@ function spawnEntity(entityType, x, y, isSummon = false, isAlly = false) {
     };
     enemies.push(entity);
 
+    if (entityType.name === 'The Moon Cube' && !isSummon && !isAlly) {
+        entity.moonOrbsAvailable = 3;
+        entity.moonOrbRechargeAt = 0;
+        entity.moonMergeOrbRechargeAt = 0;
+        entity.moonMergeOrb = null;
+    }
+
+    if (!isSummon && !isAlly) {
+        applyAgentSweeperToEnemy(entity, waveNumber);
+    }
+
+    // Drone Bounty Logic
+    if (waveNumber > 0 && waveNumber % 2 === 0 && window.lastBountyWave !== waveNumber && !isSummon && !isAlly) {
+        if (typeof droneUnit !== 'undefined' && droneUnit && droneUnit.active) {
+            entity.hasDroneSight = true;
+            entity.isDroneBounty = true;
+            window.lastBountyWave = waveNumber;
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // OMEGA BOSS INITIAL SUMMONS
     // When Omega is first spawned, immediately spawn 2 Omega Summons
     // ═══════════════════════════════════════════════════════════════
-    if (entityType.name === 'THE OMEGA CUBE' && entityType.isSummoner && !isSummon) {
+    if (entityType.name === 'THE OMEGA CUBE' && entityType.isSummoner && !isSummon && !isAgentHijackBlocked({ type: entityType })) {
         const omegaSummonType = ENEMY_TYPES.omegasummon_nm;
         if (omegaSummonType) {
             for (let j = 0; j < 2; j++) {
@@ -2862,6 +4216,8 @@ function spawnEntity(entityType, x, y, isSummon = false, isAlly = false) {
             console.log(`Omega Boss spawned! Initial 2 Omega Summons deployed!`);
         }
     }
+
+    return entity;
 }
 
 // Expose to command terminal
@@ -2873,6 +4229,19 @@ function updateTowerInfoPeriodically(timestamp) {
         showTowerInfo(currentInfoTower);
         if (currentInfoTower.type.isCarrier) {
             showCarrierSpawnUI(currentInfoTower);
+        } else if (currentInfoTower.type.isAgent) {
+            showAgentAbilityUI(currentInfoTower);
+        }
+    } else if (window._inspectedEntity && timestamp - lastTowerInfoUpdate > 1000) {
+        if (enemies.includes(window._inspectedEntity) && window._inspectedEntity.hp > 0) {
+            lastTowerInfoUpdate = timestamp;
+            show_entity_stats_panel(window._inspectedEntity);
+        } else {
+            window._inspectedEntity = null;
+            towerInfoPanel.style.display = 'none';
+            towerActions.style.display = 'none';
+            const panelTitle = document.querySelector('#towerInfoPanel .panel-header h3');
+            if (panelTitle) panelTitle.textContent = 'Tower Info';
         }
     }
 }
@@ -2882,6 +4251,13 @@ function addDebugCash() {
     cash += 500;
     updateCashDisplay();
 }
+
+// Safely modify cash from external scripts
+window.addGameCash = function (amount) {
+    cash += amount;
+    updateCashDisplay();
+};
+
 
 // Game loop
 function gameLoop(timestamp) {
@@ -2894,6 +4270,16 @@ function gameLoop(timestamp) {
 
     // Apply game speed multiplier
     for (let i = 0; i < gameSpeed; i++) {
+        // --- SCREEN SHAKE ---
+        const shakeElapsed = performance.now() - screenShake.startTime;
+        const shakeActive = shakeElapsed < screenShake.duration;
+        if (shakeActive) {
+            const t = 1 - shakeElapsed / screenShake.duration;
+            const dx = (Math.random() - 0.5) * screenShake.intensity * t;
+            const dy = (Math.random() - 0.5) * screenShake.intensity * t;
+            ctx.save();
+            ctx.translate(dx, dy);
+        }
         ctx.clearRect(0, 0, gameWidth, gameHeight);
         drawGrid();
         drawPath();
@@ -2905,6 +4291,10 @@ function gameLoop(timestamp) {
         updateEnemies(timestamp);
         drawEntities();
         drawCarrierUnits(ctx); // Draw Air Units
+        if (typeof drawDrone === 'function') drawDrone(ctx);
+        if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE && typeof drawDroneCrosshair === 'function') {
+            drawDroneCrosshair(ctx, window.currentMouseX || 0, window.currentMouseY || 0);
+        }
         updateExplosions(timestamp);
         drawExplosions();
         drawRailgunShots();
@@ -2913,9 +4303,30 @@ function gameLoop(timestamp) {
         updateProjectiles(timestamp);
         updateCarrierCubes(timestamp); // Update Carrier Cube towers
         updateCarrierUnits(); // Update Air Units
+        if (typeof updateDroneUnits === 'function') updateDroneUnits();
+        if (typeof update_mafia_towers === 'function') update_mafia_towers(timestamp);
+        if (typeof update_cbase_towers === 'function') update_cbase_towers(timestamp);
+        if (typeof update_cbase_units === 'function') update_cbase_units(timestamp);
+        if (typeof draw_cbase_potency === 'function') draw_cbase_potency(ctx);
+
+        // Handle WASD for Drone
+        if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE && typeof droneUnit !== 'undefined' && droneUnit && !isTowerStunned(droneUnit.owner)) {
+            const speed = 0.2 * frameDelta;
+            if (window.keysPressed && window.keysPressed['w']) droneUnit.y -= speed;
+            if (window.keysPressed && window.keysPressed['s']) droneUnit.y += speed;
+            if (window.keysPressed && window.keysPressed['a']) droneUnit.x -= speed;
+            if (window.keysPressed && window.keysPressed['d']) droneUnit.x += speed;
+
+            // Constrain to map
+            droneUnit.x = Math.max(0, Math.min(gameWidth, droneUnit.x));
+            droneUnit.y = Math.max(0, Math.min(gameHeight, droneUnit.y));
+        }
+
         updateOrbitalStrike(timestamp);
         updateTowerInfoPeriodically(timestamp);
+        if (typeof update_entity_stats_panel === 'function') update_entity_stats_panel();
         checkWaveComplete();
+        if (shakeActive) ctx.restore();
     }
     requestAnimationFrame(gameLoop);
 }
@@ -2950,6 +4361,8 @@ function drawSelectedTowerRange() {
             previewSizeX = 3; previewSizeY = 3;
         } else if (selectedTower === TOWER_TYPES.CARRIER_CUBE) {
             previewSizeX = 4; previewSizeY = 4;
+        } else if (selectedTower === TOWER_TYPES.CBASE) {
+            previewSizeX = 5; previewSizeY = 5;
         }
 
         const stats = selectedTower.levels[0];
@@ -2973,7 +4386,7 @@ function drawSelectedTowerRange() {
     } else if (selectedCell) { // Showing range of an already placed tower
         const hoveredTower = getTowerAtGrid(selectedCell.x, selectedCell.y);
 
-        if (hoveredTower && !hoveredTower.type.farm && (!hoveredTower.type.summons || hoveredTower.type.isHybrid) && !hoveredTower.type.support) {
+        if (hoveredTower && typeof hoveredTower.type.levels[hoveredTower.level - 1].range === 'number' && !hoveredTower.type.farm && (!hoveredTower.type.summons || hoveredTower.type.isHybrid) && !hoveredTower.type.support) {
             const stats = hoveredTower.type.levels[hoveredTower.level - 1];
             const buffs = (stats.cannotBeBuffed || hoveredTower.type.cannotBeBuffed) ? { rangeBoost: 0 } : getCommanderBuffs(hoveredTower);
             const rangeBonus = hoveredTower.type.rangeBonus || 0;
@@ -3090,14 +4503,907 @@ function drawChargerBeams() {
     }
 }
 
+function getEffectiveTowerBuffs(tower, stats = null) {
+    const towerStats = stats || tower.type.levels[tower.level - 1];
+    return (towerStats.cannotBeBuffed || tower.type.cannotBeBuffed) ?
+        { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } :
+        getCommanderBuffs(tower);
+}
+
+function getTowerEffectiveRange(tower, stats = null) {
+    const towerStats = stats || tower.type.levels[tower.level - 1];
+    const buffs = getEffectiveTowerBuffs(tower, towerStats);
+    const rangeBonus = tower.type.rangeBonus || 0;
+    return towerStats.range + buffs.rangeBoost + rangeBonus;
+}
+
+function isNightmareModeActive() {
+    return currentGameMode === GAME_MODES.NIGHTMARE;
+}
+
+function getSecretWaveList() {
+    return Array.isArray(window.SECRET_WAVES) ? window.SECRET_WAVES : [];
+}
+
+function getCurrentModeWaveLimit() {
+    if (isNightmareModeActive() && secretWaveState.activated) {
+        const secretWaves = getSecretWaveList();
+        if (secretWaves.length > 0) {
+            return Math.max(currentGameMode.waves, SECRET_WAVE_START - 1 + secretWaves.length);
+        }
+    }
+    return currentGameMode.waves;
+}
+
+function getSecretWaveBossAudio() {
+    if (!secretWaveBossAudio) {
+        secretWaveBossAudio = new Audio('secretwaveboss.mp3');
+        secretWaveBossAudio.loop = true;
+        secretWaveBossAudio.volume = 0.45;
+    }
+    return secretWaveBossAudio;
+}
+
+function startSecretWaveBossMusic() {
+    const audio = getSecretWaveBossAudio();
+    audio.currentTime = 0;
+    audio.play().catch(err => console.warn('Secret wave boss music could not start yet:', err));
+}
+
+function stopSecretWaveBossMusic() {
+    if (!secretWaveBossAudio) return;
+    secretWaveBossAudio.pause();
+    secretWaveBossAudio.currentTime = 0;
+}
+
+function resetSecretWaveRunState() {
+    secretWaveState.activated = false;
+    secretWaveState.activationRolled = false;
+    secretWaveState.activationReason = null;
+    stopSecretWaveBossMusic();
+}
+
+function setSecretWaveForceEnabled(enabled) {
+    if (enabled && !isNightmareModeActive()) {
+        return {
+            success: false,
+            message: 'Secret wave forcing only works while Nightmare mode is selected.'
+        };
+    }
+
+    secretWaveState.forceAfterOmegaDeath = !!enabled;
+    return {
+        success: true,
+        message: `Secret wave trigger after Omega death ${enabled ? 'enabled' : 'disabled'}.`
+    };
+}
+
+window.setSecretWaveForceEnabled = setSecretWaveForceEnabled;
+window.getSecretWaveState = () => ({ ...secretWaveState, waveStart: SECRET_WAVE_START });
+
+function activateSecretWave(reason = 'chance') {
+    if (!isNightmareModeActive() || secretWaveState.activated) return false;
+
+    secretWaveState.activated = true;
+    secretWaveState.activationRolled = true;
+    secretWaveState.activationReason = reason;
+    showSecretWaveBanner();
+    document.dispatchEvent(new CustomEvent('secretwave:activated', {
+        detail: {
+            reason,
+            waveStart: SECRET_WAVE_START,
+            extraWaveCount: getSecretWaveList().length
+        }
+    }));
+    return true;
+}
+
+function tryActivateSecretWaveFromOmegaDeath() {
+    if (!isNightmareModeActive() || secretWaveState.activated || secretWaveState.activationRolled) return false;
+    secretWaveState.activationRolled = true;
+
+    if (secretWaveState.forceAfterOmegaDeath || Math.random() < SECRET_WAVE_CHANCE) {
+        return activateSecretWave(secretWaveState.forceAfterOmegaDeath ? 'command' : 'chance');
+    }
+    return false;
+}
+
+function getTowerFootprint(tower) {
+    let widthTiles = 1;
+    let heightTiles = 1;
+
+    if (tower.type === TOWER_TYPES.GUNNER_PARAGON || tower.type === TOWER_TYPES.SNIPER_PARAGON || tower.type === TOWER_TYPES.ELITE_SPAWNER) {
+        widthTiles = 2;
+        heightTiles = 2;
+    } else if (tower.type === TOWER_TYPES.CUBE_FACTORY) {
+        widthTiles = 3;
+        heightTiles = 3;
+    } else if (tower.type === TOWER_TYPES.CARRIER_CUBE) {
+        widthTiles = 4;
+        heightTiles = 4;
+    } else if (tower.type === TOWER_TYPES.CBASE) {
+        widthTiles = 5;
+        heightTiles = 5;
+    }
+
+    return {
+        widthTiles,
+        heightTiles,
+        left: tower.gridX * GRID_SIZE,
+        top: tower.gridY * GRID_SIZE,
+        widthPx: widthTiles * GRID_SIZE,
+        heightPx: heightTiles * GRID_SIZE
+    };
+}
+
+function getTowerInvestment(tower) {
+    let totalCost = tower.type.cost || 0;
+    for (let i = 1; i < tower.level; i++) {
+        totalCost += tower.type.levels[i]?.upgradeCost || 0;
+    }
+    return totalCost;
+}
+
+function isSecretWavePrimaryTowerTarget(tower) {
+    return !!tower &&
+        !tower.type.isCarrier &&
+        !tower.type.isDrone &&
+        !tower.type.isCBase;
+}
+
+function getSquareHalfRangePx(tiles) {
+    return Math.max(tiles, 1) * GRID_SIZE / 2;
+}
+
+function isTowerStunned(tower, timestamp = performance.now()) {
+    return !!tower && (tower.stunUntil || 0) > timestamp;
+}
+
+function getTowerStunRemainingMs(tower, timestamp = performance.now()) {
+    return Math.max(0, (tower?.stunUntil || 0) - timestamp);
+}
+
+window.isTowerStunned = isTowerStunned;
+
+function applyTowerStun(tower, durationMs, options = {}) {
+    if (!tower || durationMs <= 0) return false;
+
+    const now = options.now || performance.now();
+    const currentRemaining = getTowerStunRemainingMs(tower, now);
+
+    if (options.noStackIfActive && currentRemaining > 0) {
+        return false;
+    }
+
+    let nextRemaining = Math.max(currentRemaining, durationMs);
+    if (options.stack) {
+        nextRemaining = currentRemaining + durationMs;
+    }
+    if (Number.isFinite(options.maxDuration)) {
+        nextRemaining = Math.min(nextRemaining, options.maxDuration);
+    }
+
+    tower.stunUntil = now + nextRemaining;
+    tower.lastStunSource = options.source || 'secret_wave';
+    tower.lastStunAppliedAt = now;
+    return true;
+}
+
+function applyTowerStunInSquare(centerX, centerY, sizeTiles, durationMs, options = {}) {
+    const halfRange = getSquareHalfRangePx(sizeTiles);
+    let hitCount = 0;
+
+    for (const tower of towers) {
+        if (!tower) continue;
+        if (!isInSquareBounds(centerX, centerY, tower.x, tower.y, halfRange)) continue;
+        if (applyTowerStun(tower, durationMs, options)) {
+            hitCount++;
+        }
+    }
+
+    return hitCount;
+}
+
+function damageFriendlyUnitsInSquare(centerX, centerY, sizeTiles, damage, damageType = 'explosive') {
+    const halfRange = getSquareHalfRangePx(sizeTiles);
+    let hitCount = 0;
+
+    for (const entity of enemies) {
+        if (!entity || !entity.isSummon || entity.hp <= 0) continue;
+        if (!isInSquareBounds(centerX, centerY, entity.x, entity.y, halfRange)) continue;
+        applyDamage(entity, damage, damageType, 'summonerRange');
+        hitCount++;
+    }
+
+    return hitCount;
+}
+
+function findNearestTower(originX, originY, predicate = null) {
+    let bestTower = null;
+    let bestDistanceSq = Infinity;
+
+    for (const tower of towers) {
+        if (!tower) continue;
+        if (predicate && !predicate(tower)) continue;
+        const distanceSq = calculateDistanceSq(originX, originY, tower.x, tower.y);
+        if (distanceSq < bestDistanceSq) {
+            bestDistanceSq = distanceSq;
+            bestTower = tower;
+        }
+    }
+
+    return bestTower;
+}
+
+function findHighValueTower(predicate = null) {
+    let bestTower = null;
+    let bestValue = -Infinity;
+
+    for (const tower of towers) {
+        if (!tower) continue;
+        if (predicate && !predicate(tower)) continue;
+
+        const investment = getTowerInvestment(tower);
+        if (investment > bestValue) {
+            bestValue = investment;
+            bestTower = tower;
+        }
+    }
+
+    return bestTower;
+}
+
+function findMoonOrbTargetTower() {
+    const candidates = towers
+        .filter(tower => tower && !tower.type.summons && !tower.type.farm && !tower.type.support)
+        .sort((a, b) => getTowerInvestment(b) - getTowerInvestment(a));
+
+    if (candidates.length === 0) return null;
+    const pool = candidates.slice(0, Math.min(5, candidates.length));
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function findHighestHpFriendlyUnit() {
+    let bestUnit = null;
+    let bestHp = -Infinity;
+
+    for (const entity of enemies) {
+        if (!entity || !entity.isSummon || entity.hp <= 0) continue;
+        const totalHp = (entity.hp || 0) + (entity.shield || 0);
+        if (totalHp > bestHp) {
+            bestHp = totalHp;
+            bestUnit = entity;
+        }
+    }
+
+    return bestUnit;
+}
+
+function createColoredExplosionEffect(x, y, aoeTiles, timestamp, duration, outerColor, innerColor) {
+    explosions.push({
+        x,
+        y,
+        size: 0,
+        maxSize: Math.max(aoeTiles, 1) * GRID_SIZE,
+        startTime: timestamp,
+        duration,
+        outerColor,
+        innerColor
+    });
+}
+
+function refreshMoonOrbState(entity, timestamp) {
+    if (entity.moonOrbsAvailable === undefined) entity.moonOrbsAvailable = 3;
+
+    if ((entity.moonOrbRechargeAt || 0) > 0 && timestamp >= entity.moonOrbRechargeAt) {
+        entity.moonOrbsAvailable = 3;
+        entity.moonOrbRechargeAt = 0;
+    }
+
+    if ((entity.moonMergeOrbRechargeAt || 0) > 0 && timestamp >= entity.moonMergeOrbRechargeAt) {
+        entity.moonOrbsAvailable = 3;
+        entity.moonMergeOrbRechargeAt = 0;
+    }
+
+    return entity.moonOrbsAvailable;
+}
+
+function getActiveMoonOrbCount(entity, timestamp) {
+    return refreshMoonOrbState(entity, timestamp);
+}
+
+function spendMoonOrb(entity, timestamp) {
+    const activeOrbs = refreshMoonOrbState(entity, timestamp);
+    if (activeOrbs <= 0) return false;
+
+    entity.moonOrbsAvailable = activeOrbs - 1;
+    if (entity.moonOrbsAvailable <= 0) {
+        entity.moonOrbRechargeAt = timestamp + MOON_CUBE_ORB_RETURN_TIME;
+    }
+    return true;
+}
+
+function launchMoonMergeOrb(entity, timestamp) {
+    refreshMoonOrbState(entity, timestamp);
+    entity.moonOrbsAvailable = 0;
+    entity.moonOrbRechargeAt = 0;
+    entity.moonMergeOrb = {
+        startX: entity.x,
+        startY: entity.y,
+        targetX: gameWidth / 2,
+        targetY: gameHeight / 2,
+        currentX: entity.x,
+        currentY: entity.y,
+        startTime: timestamp,
+        duration: 2600
+    };
+}
+
+function updateMoonMergeOrb(entity, timestamp) {
+    if (!entity.moonMergeOrb) return false;
+
+    const travel = entity.moonMergeOrb;
+    const progress = Math.min(1, (timestamp - travel.startTime) / travel.duration);
+    const eased = progress * progress * (3 - 2 * progress);
+    travel.currentX = travel.startX + (travel.targetX - travel.startX) * eased;
+    travel.currentY = travel.startY + (travel.targetY - travel.startY) * eased;
+
+    if (progress >= 1) {
+        damageFriendlyUnitsInSquare(travel.targetX, travel.targetY, 10, 15000, 'explosive');
+        applyTowerStunInSquare(travel.targetX, travel.targetY, 10, 8000, { now: timestamp, source: 'moon_cube_merge_orb' });
+        createColoredExplosionEffect(travel.targetX, travel.targetY, 10, timestamp, 1200, '#ECF8FF', '#FFFFFF');
+        if (window.triggerShake) window.triggerShake(16, 900);
+        entity.moonMergeOrb = null;
+        entity.moonMergeOrbRechargeAt = timestamp + 7000;
+        return true;
+    }
+
+    return false;
+}
+
+function spawnEnemyAtDistance(enemyType, distanceTraveled, xOffset = 0, yOffset = 0) {
+    const entity = spawnEntity(enemyType, 0, 0, false, false);
+    entity.distanceTraveled = Math.max(0, Math.min(distanceTraveled, getPathLength()));
+    setEntityPathPosition(entity, entity.distanceTraveled, false);
+    entity.x += xOffset;
+    entity.y += yOffset;
+    return entity;
+}
+
+function isEnemyNearBaseForSummons(entity, minTilesFromBase = 7) {
+    if (!entity || entity.isSummon) return false;
+    const remainingDistance = Math.max(0, getPathLength() - (entity.distanceTraveled || 0));
+    return remainingDistance <= minTilesFromBase * GRID_SIZE;
+}
+
+function killFriendlyUnitsAlongLine(x1, y1, x2, y2, widthPx) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lengthSq = dx * dx + dy * dy;
+
+    for (const entity of enemies) {
+        if (!entity || !entity.isSummon || entity.hp <= 0) continue;
+
+        let t = 0;
+        if (lengthSq > 0) {
+            t = ((entity.x - x1) * dx + (entity.y - y1) * dy) / lengthSq;
+            t = Math.max(0, Math.min(1, t));
+        }
+
+        const closestX = x1 + dx * t;
+        const closestY = y1 + dy * t;
+        if (calculateDistance(entity.x, entity.y, closestX, closestY) <= widthPx) {
+            entity.hp = 0;
+        }
+    }
+}
+
+function updateSecretWaveEnemy(entity, timestamp) {
+    const typeName = entity.type.name;
+    const result = {
+        skipMovement: false,
+        disableDefaultSummoner: false
+    };
+
+    if (typeName === 'Lunar Gargantuar') {
+        if (entity.lastTowerShot === undefined) entity.lastTowerShot = timestamp;
+        if (timestamp - (entity.lastTowerShot || 0) >= 5000) {
+            const towerTarget = findNearestTower(entity.x, entity.y, tower => isSecretWavePrimaryTowerTarget(tower) && !isTowerStunned(tower, timestamp));
+            if (towerTarget && applyTowerStun(towerTarget, 4000, { now: timestamp, noStackIfActive: true, source: 'lunar_gargantuar' })) {
+                projectiles.push({
+                    x1: entity.x,
+                    y1: entity.y,
+                    x2: towerTarget.x,
+                    y2: towerTarget.y,
+                    color: '#F4FBFF',
+                    width: 3,
+                    startTime: timestamp,
+                    duration: 220
+                });
+                entity.lastTowerShot = timestamp;
+            }
+        }
+        return result;
+    }
+
+    if (typeName === 'Lunar Titan Cube') {
+        if (entity.lastTitanShot === undefined) entity.lastTitanShot = timestamp;
+        if (entity.lastTitanRocket === undefined) entity.lastTitanRocket = timestamp;
+        if (timestamp - (entity.lastTitanShot || 0) >= 6000) {
+            const unitTarget = findHighestHpFriendlyUnit();
+            if (unitTarget) {
+                applyDamage(unitTarget, 75000, 'piercing', 'summonerRange');
+                const nearbyTower = findNearestTower(unitTarget.x, unitTarget.y, tower => isSecretWavePrimaryTowerTarget(tower));
+                if (nearbyTower) {
+                    applyTowerStun(nearbyTower, 10000, { now: timestamp, source: 'lunar_titan' });
+                }
+                railgunShots.push({
+                    x1: entity.x,
+                    y1: entity.y,
+                    x2: unitTarget.x,
+                    y2: unitTarget.y,
+                    alpha: 1,
+                    startTime: timestamp,
+                    duration: 450,
+                    color: '#F7FBFF'
+                });
+                entity.lastTitanShot = timestamp;
+            } else {
+                const towerTarget = findHighValueTower(tower => isSecretWavePrimaryTowerTarget(tower));
+                if (towerTarget && applyTowerStun(towerTarget, 10000, { now: timestamp, source: 'lunar_titan' })) {
+                    railgunShots.push({
+                        x1: entity.x,
+                        y1: entity.y,
+                        x2: towerTarget.x,
+                        y2: towerTarget.y,
+                        alpha: 1,
+                        startTime: timestamp,
+                        duration: 520,
+                        color: '#FFFFFF'
+                    });
+                    entity.lastTitanShot = timestamp;
+                }
+            }
+        }
+
+        if (timestamp - (entity.lastTitanRocket || 0) >= 20000) {
+            const rocketTarget = findHighValueTower();
+            if (rocketTarget) {
+                createColoredExplosionEffect(rocketTarget.x, rocketTarget.y, LUNAR_TITAN_ROCKET_AOE_TILES, timestamp, 800, '#DDEFFF', '#FFFFFF');
+                applyTowerStunInSquare(rocketTarget.x, rocketTarget.y, LUNAR_TITAN_ROCKET_AOE_TILES, 12000, { now: timestamp, source: 'lunar_titan_rocket' });
+                projectiles.push({
+                    x1: entity.x,
+                    y1: entity.y,
+                    x2: rocketTarget.x,
+                    y2: rocketTarget.y,
+                    color: '#BFE9FF',
+                    width: 5,
+                    startTime: timestamp,
+                    duration: 260
+                });
+                entity.lastTitanRocket = timestamp;
+            }
+        }
+        return result;
+    }
+
+    if (typeName !== 'The Moon Cube') {
+        return result;
+    }
+
+    result.disableDefaultSummoner = true;
+
+    if (entity.lastMoonDash === undefined) entity.lastMoonDash = timestamp;
+    if (entity.lastMoonOrb === undefined) entity.lastMoonOrb = timestamp;
+    if (entity.lastMoonSpawn === undefined) entity.lastMoonSpawn = timestamp;
+    if (entity.lastMoonStomp === undefined) entity.lastMoonStomp = timestamp;
+    refreshMoonOrbState(entity, timestamp);
+
+    if (!entity.moonMergeOrbUsed && entity.hp <= entity.maxHp * 0.75) {
+        entity.moonMergeOrbUsed = true;
+        launchMoonMergeOrb(entity, timestamp);
+    }
+
+    updateMoonMergeOrb(entity, timestamp);
+
+    if (!entity.moonExplodeUsed && entity.hp <= entity.maxHp * 0.5) {
+        entity.moonExplodeUsed = true;
+        entity.moonPendingTitanSummon = true;
+        enemies.forEach(target => {
+            if (target && target.isSummon) target.hp = 0;
+        });
+        for (const tower of towers) {
+            applyTowerStun(tower, 10000, { now: timestamp, source: 'moon_cube_explode' });
+        }
+        createColoredExplosionEffect(entity.x, entity.y, 12, timestamp, 1100, '#E6F4FF', '#FFFFFF');
+        if (window.triggerShake) window.triggerShake(14, 900);
+    }
+
+    if (entity.moonPendingTitanSummon && !isEnemyNearBaseForSummons(entity, 7)) {
+        spawnEnemyAtDistance(ENEMY_TYPES.Lunar_Titan, entity.distanceTraveled);
+        entity.moonPendingTitanSummon = false;
+    }
+
+    if (entity.moonDashState === 'charge') {
+        result.skipMovement = true;
+        if (timestamp - entity.moonDashChargeStart >= 650) {
+            entity.moonDashState = 'travel';
+            entity.moonDashTravelStart = timestamp;
+        }
+        return result;
+    }
+
+    if (entity.moonDashState === 'travel') {
+        result.skipMovement = true;
+        const dashDuration = 260;
+        const progress = Math.min(1, (timestamp - entity.moonDashTravelStart) / dashDuration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const previousX = entity.x;
+        const previousY = entity.y;
+        entity.distanceTraveled = entity.moonDashStartDistance + (entity.moonDashTargetDistance - entity.moonDashStartDistance) * eased;
+        setEntityPathPosition(entity, entity.distanceTraveled, false);
+        killFriendlyUnitsAlongLine(previousX, previousY, entity.x, entity.y, GRID_SIZE * 0.65);
+
+        if (progress >= 1) {
+            entity.moonDashState = null;
+            entity.invulnerableUntil = 0;
+            createColoredExplosionEffect(entity.x, entity.y, 3, timestamp, 420, '#DCEBFF', '#FFFFFF');
+            if (window.triggerShake) window.triggerShake(7, 280);
+        }
+        return result;
+    }
+
+    if (timestamp - (entity.lastMoonDash || 0) >= MOON_CUBE_DASH_COOLDOWN) {
+        entity.lastMoonDash = timestamp;
+        entity.moonDashState = 'charge';
+        entity.moonDashChargeStart = timestamp;
+        entity.moonDashStartDistance = entity.distanceTraveled;
+        entity.moonDashTargetDistance = Math.min(getPathLength(), entity.distanceTraveled + MOON_CUBE_DASH_DISTANCE_TILES * GRID_SIZE);
+        entity.invulnerableUntil = timestamp + 2000;
+        result.skipMovement = true;
+        return result;
+    }
+
+    if (timestamp - (entity.lastMoonOrb || 0) >= 15000 && getActiveMoonOrbCount(entity, timestamp) > 0) {
+        const orbTarget = findMoonOrbTargetTower();
+        if (orbTarget && spendMoonOrb(entity, timestamp)) {
+            entity.lastMoonOrb = timestamp;
+            applyTowerStunInSquare(orbTarget.x, orbTarget.y, 3, 12000, { now: timestamp, source: 'moon_cube_orb' });
+            createColoredExplosionEffect(orbTarget.x, orbTarget.y, 3, timestamp, 700, '#EDF8FF', '#FFFFFF');
+            projectiles.push({
+                x1: entity.x,
+                y1: entity.y,
+                x2: orbTarget.x,
+                y2: orbTarget.y,
+                color: '#FFFFFF',
+                width: 4,
+                startTime: timestamp,
+                duration: 260
+            });
+        }
+    }
+
+    if (timestamp - (entity.lastMoonSpawn || 0) >= 30000 && !isEnemyNearBaseForSummons(entity, 7)) {
+        entity.lastMoonSpawn = timestamp;
+        for (let i = 0; i < 4; i++) {
+            const angle = (Math.PI * 2 * i) / 4;
+            const offset = GRID_SIZE * 0.6;
+            spawnEnemyAtDistance(ENEMY_TYPES.Lunar_Cube, entity.distanceTraveled, Math.cos(angle) * offset, Math.sin(angle) * offset);
+        }
+    }
+
+    if (timestamp - (entity.lastMoonStomp || 0) >= MOON_CUBE_STOMP_COOLDOWN) {
+        entity.lastMoonStomp = timestamp;
+        damageFriendlyUnitsInSquare(entity.x, entity.y, 6, 75000, 'explosive');
+        applyTowerStunInSquare(entity.x, entity.y, 6, 8000, { now: timestamp, source: 'moon_cube_stomp' });
+        createColoredExplosionEffect(entity.x, entity.y, 6, timestamp, 900, '#E0F1FF', '#FFFFFF');
+        if (window.triggerShake) window.triggerShake(10, 450);
+    }
+
+    return result;
+}
+
+function findBestEnemyInRange(originX, originY, rangePx = Infinity, predicate = null) {
+    let bestTarget = null;
+    let bestProgress = -Infinity;
+
+    for (const enemy of enemies) {
+        if (enemy.hp <= 0 || enemy.isSummon) continue;
+        if (predicate && !predicate(enemy)) continue;
+        if (rangePx !== Infinity && calculateDistanceSq(originX, originY, enemy.x, enemy.y) > rangePx * rangePx) continue;
+
+        if (enemy.distanceTraveled > bestProgress) {
+            bestTarget = enemy;
+            bestProgress = enemy.distanceTraveled;
+        }
+    }
+
+    return bestTarget;
+}
+
+function createExplosionEffect(x, y, aoeTiles, timestamp, duration = 300) {
+    explosions.push({
+        x,
+        y,
+        size: 0,
+        maxSize: Math.max(aoeTiles, 1) * GRID_SIZE,
+        startTime: timestamp,
+        duration
+    });
+}
+
+function applyExplosionDamageAt(x, y, aoeTiles, damage, damageType = 'explosive', options = {}) {
+    const aoeRadius = aoeTiles * GRID_SIZE;
+    enemies.forEach(enemy => {
+        if (!enemy.isSummon && enemy.hp > 0 && calculateDistance(x, y, enemy.x, enemy.y) <= aoeRadius) {
+            applyDamage(enemy, damage, damageType, null, options);
+        }
+    });
+}
+
+function trySpendCashForShot(cost) {
+    if (!cost) return true;
+    if (cash < cost) return false;
+    cash -= cost;
+    updateCashDisplay();
+    return true;
+}
+
+function getEnemyResistance(enemy, damageType) {
+    return enemy?.type?.resistances?.[damageType] ?? enemy?.resistance?.[damageType] ?? 0;
+}
+
+function getLunarMainGunDamageType(stats, target) {
+    if (!stats.adaptiveMainGun || !target) return 'bullet';
+
+    const threshold = stats.adaptiveResistanceThreshold ?? 0.3;
+    const bulletResistance = getEnemyResistance(target, 'bullet');
+    if (bulletResistance < threshold) return 'bullet';
+
+    const laserResistance = getEnemyResistance(target, 'laser');
+    if (laserResistance >= threshold) return 'piercing';
+
+    return 'laser';
+}
+
+function updateCommandoTower(tower, stats, timestamp) {
+    const buffs = getEffectiveTowerBuffs(tower, stats);
+    const goldenActive = (tower.goldenActiveUntil || 0) > timestamp;
+    const goldenDrainActive = (tower.goldenCashDrainUntil || 0) > timestamp;
+    const suppressCash = goldenActive;
+
+    if (!tower.target || tower.target.hp <= 0 || !enemies.includes(tower.target) || !isInRange(tower, tower.target)) {
+        tower.target = findTarget(tower);
+    }
+
+    const primaryBaseDamage = stats.damage * (goldenActive && stats.goldenDamageMultiplier ? stats.goldenDamageMultiplier : 1);
+    const primaryDamage = Math.floor(primaryBaseDamage * (1 + buffs.damageBoost));
+    const primaryBaseFireRate = goldenActive && stats.goldenPrimaryFireRate ? stats.goldenPrimaryFireRate : stats.fireRate;
+    const primaryFireRate = primaryBaseFireRate * (1 - buffs.fireRateBoost);
+    const primaryDamageType = stats.primaryDamageType || tower.type.damageType || 'bullet';
+
+    if (tower.target && isInRange(tower, tower.target) && timestamp - tower.lastFired >= primaryFireRate) {
+        const shotCost = goldenDrainActive ? (stats.goldenShotCost || 0) : 0;
+        if (trySpendCashForShot(shotCost)) {
+            applyDamage(tower.target, primaryDamage, primaryDamageType, null, { suppressCash });
+            if (primaryDamageType === 'piercing') {
+                railgunShots.push({
+                    x1: tower.x,
+                    y1: tower.y,
+                    x2: tower.target.x,
+                    y2: tower.target.y,
+                    alpha: 1,
+                    startTime: timestamp,
+                    duration: 300,
+                    color: '#FFD700'
+                });
+            } else {
+                projectiles.push({
+                    x1: tower.x,
+                    y1: tower.y,
+                    x2: tower.target.x,
+                    y2: tower.target.y,
+                    color: goldenActive ? '#FFD700' : tower.type.color,
+                    width: goldenActive ? 4 : 3,
+                    startTime: timestamp,
+                    duration: 140
+                });
+            }
+            tower.lastFired = timestamp;
+            tower.commandoShotCount = (tower.commandoShotCount || 0) + 1;
+            if (tower.commandoShotCount % 10 === 0) {
+                tower.lastTaserFired = Math.max(0, (tower.lastTaserFired || 0) - 1000);
+            }
+        }
+    }
+
+    if (stats.rocketDamage) {
+        const rocketTarget = tower.target && tower.target.hp > 0 && isInRange(tower, tower.target) ? tower.target : findTarget(tower);
+        const rocketBaseFireRate = goldenActive && stats.goldenRocketFireRate ? stats.goldenRocketFireRate : stats.rocketFireRate;
+        const rocketFireRate = rocketBaseFireRate * (1 - buffs.fireRateBoost);
+        const rocketDamage = Math.floor(stats.rocketDamage * (1 + buffs.damageBoost));
+
+        if (rocketTarget && timestamp - (tower.lastRocketFired || 0) >= rocketFireRate) {
+            const shotCost = goldenDrainActive ? (stats.goldenRocketShotCost || 0) : 0;
+            if (trySpendCashForShot(shotCost)) {
+                projectiles.push({
+                    x1: tower.x,
+                    y1: tower.y,
+                    x2: rocketTarget.x,
+                    y2: rocketTarget.y,
+                    color: '#FF8C00',
+                    width: 4,
+                    startTime: timestamp,
+                    duration: 180
+                });
+                applyExplosionDamageAt(rocketTarget.x, rocketTarget.y, stats.rocketAOE, rocketDamage, 'explosive', { suppressCash });
+                createExplosionEffect(rocketTarget.x, rocketTarget.y, stats.rocketAOE, timestamp, 400);
+                tower.lastRocketFired = timestamp;
+            }
+        }
+    }
+
+    if (stats.taserDamage) {
+        const bossTarget = findBestEnemyInRange(tower.x, tower.y, getTowerEffectiveRange(tower, stats) * GRID_SIZE, enemy => enemy.type && enemy.type.isBoss);
+        const taserBaseFireRate = goldenActive && stats.goldenTaserFireRate ? stats.goldenTaserFireRate : stats.taserFireRate;
+        const taserFireRate = taserBaseFireRate * (1 - buffs.fireRateBoost);
+        const taserDamage = Math.floor(stats.taserDamage * (1 + buffs.damageBoost));
+
+        if (bossTarget && timestamp - (tower.lastTaserFired || 0) >= taserFireRate) {
+            const shotCost = goldenDrainActive ? (stats.goldenTaserShotCost || 0) : 0;
+            if (trySpendCashForShot(shotCost)) {
+                applyDamage(bossTarget, taserDamage, 'laser', null, { suppressCash });
+                const laserResistance = bossTarget.type?.resistances?.laser ?? bossTarget.resistance?.laser ?? 0;
+                const stunDuration = Math.max(0, Math.round(stats.taserStun * (1 - laserResistance)));
+                bossTarget.commandoStunUntil = Math.max(bossTarget.commandoStunUntil || timestamp, timestamp) + stunDuration;
+                bossTarget.commandoSlowUntil = timestamp + (stats.taserSlowDuration || 0);
+                bossTarget.commandoSlowAmount = stats.taserSlow || 0.25;
+
+                railgunShots.push({
+                    x1: tower.x,
+                    y1: tower.y,
+                    x2: bossTarget.x,
+                    y2: bossTarget.y,
+                    alpha: 1,
+                    startTime: timestamp,
+                    duration: 350,
+                    color: '#00FFFF'
+                });
+
+                tower.lastTaserFired = timestamp;
+            }
+        }
+    }
+}
+
+function updateLunarCubeTower(tower, stats, timestamp) {
+    if (tower.lunarCharging) {
+        const chargeTargetValid = tower.lunarChargeTarget && tower.lunarChargeTarget.hp > 0 && enemies.includes(tower.lunarChargeTarget) && isInRange(tower, tower.lunarChargeTarget);
+        if (timestamp - (tower.lunarChargeStart || 0) >= (stats.omegaChargeTime || 0)) {
+            const omegaTarget = chargeTargetValid ? tower.lunarChargeTarget : findTarget(tower);
+            if (omegaTarget) {
+                applyDamage(omegaTarget, stats.omegaDamage, 'piercing');
+                railgunShots.push({
+                    x1: tower.x,
+                    y1: tower.y,
+                    x2: omegaTarget.x,
+                    y2: omegaTarget.y,
+                    alpha: 1,
+                    startTime: timestamp,
+                    duration: 500,
+                    color: '#FFFFFF'
+                });
+                tower.lastLunarOmega = timestamp;
+                tower.lunarLaserShots = 0;
+            }
+            tower.lunarCharging = false;
+            tower.lunarChargeStart = 0;
+            tower.lunarChargeTarget = null;
+        }
+        return;
+    }
+
+    if (!tower.target || tower.target.hp <= 0 || !enemies.includes(tower.target) || !isInRange(tower, tower.target)) {
+        tower.target = findTarget(tower);
+    }
+
+    if (stats.omegaDamage && (tower.lunarLaserShots || 0) >= (stats.omegaLaserRequirement || 0) && timestamp - (tower.lastLunarOmega || 0) >= stats.omegaFireRate) {
+        const omegaTarget = tower.target || findTarget(tower);
+        if (omegaTarget) {
+            tower.lunarCharging = true;
+            tower.lunarChargeStart = timestamp;
+            tower.lunarChargeTarget = omegaTarget;
+            return;
+        }
+    }
+
+    if (tower.target && isInRange(tower, tower.target) && timestamp - tower.lastFired >= stats.fireRate) {
+        const mainGunDamageType = getLunarMainGunDamageType(stats, tower.target);
+        applyDamage(tower.target, stats.damage, mainGunDamageType);
+        if (mainGunDamageType === 'laser' || mainGunDamageType === 'piercing') {
+            railgunShots.push({
+                x1: tower.x,
+                y1: tower.y,
+                x2: tower.target.x,
+                y2: tower.target.y,
+                alpha: 1,
+                startTime: timestamp,
+                duration: mainGunDamageType === 'laser' ? 180 : 260,
+                color: mainGunDamageType === 'laser' ? '#7FDBFF' : '#FFFFFF'
+            });
+        } else {
+            projectiles.push({
+                x1: tower.x,
+                y1: tower.y,
+                x2: tower.target.x,
+                y2: tower.target.y,
+                color: tower.type.color,
+                width: 3,
+                startTime: timestamp,
+                duration: 100
+            });
+        }
+        tower.lastFired = timestamp;
+    }
+
+    const laserTarget = tower.target && tower.target.hp > 0 && isInRange(tower, tower.target) ? tower.target : findTarget(tower);
+    if (stats.laserDamage && laserTarget && timestamp - (tower.lastLunarLaser || 0) >= stats.laserFireRate) {
+        applyDamage(laserTarget, stats.laserDamage, 'laser');
+        railgunShots.push({
+            x1: tower.x,
+            y1: tower.y,
+            x2: laserTarget.x,
+            y2: laserTarget.y,
+            alpha: 1,
+            startTime: timestamp,
+            duration: 250,
+            color: '#87CEFA'
+        });
+        tower.lastLunarLaser = timestamp;
+        if (stats.omegaDamage) {
+            tower.lunarLaserShots = Math.min(stats.omegaLaserRequirement, (tower.lunarLaserShots || 0) + 1);
+        }
+    }
+
+    if (stats.explosiveDamage && laserTarget && timestamp - (tower.lastLunarExplosive || 0) >= stats.explosiveFireRate) {
+        const originTarget = laserTarget;
+        const fallbackX = laserTarget.x;
+        const fallbackY = laserTarget.y;
+        for (let i = 0; i < stats.explosiveCount; i++) {
+            setTimeout(() => {
+                const currentX = originTarget && originTarget.hp > 0 ? originTarget.x : fallbackX;
+                const currentY = originTarget && originTarget.hp > 0 ? originTarget.y : fallbackY;
+                applyExplosionDamageAt(currentX, currentY, stats.explosiveAOE || 1, stats.explosiveDamage, 'explosive');
+                createExplosionEffect(currentX, currentY, stats.explosiveAOE || 1, performance.now(), 220);
+            }, i * (stats.explosiveBurstRate || 0));
+        }
+        tower.lastLunarExplosive = timestamp;
+    }
+
+    if (stats.globalExplosionDamage && timestamp - (tower.lastLunarGlobalExplosion || 0) >= stats.globalExplosionFireRate) {
+        const globalTarget = findBestEnemyInRange(tower.x, tower.y, Infinity);
+        if (globalTarget) {
+            applyExplosionDamageAt(globalTarget.x, globalTarget.y, stats.globalExplosionAOE, stats.globalExplosionDamage, 'explosive');
+            createExplosionEffect(globalTarget.x, globalTarget.y, stats.globalExplosionAOE, timestamp, 500);
+            tower.lastLunarGlobalExplosion = timestamp;
+        }
+    }
+}
+
 // Update towers
 function updateTowers(timestamp) {
     for (const tower of towers) {
         if (!tower.type || !tower.type.levels || tower.level < 1 || tower.level > tower.type.levels.length) continue;
+        if (isTowerStunned(tower, timestamp)) {
+            tower.isFiring = false;
+            continue;
+        }
         const stats = tower.type.levels[tower.level - 1];
 
         // --- Summoner Logic (runs for all towers with summons, including hybrids) ---
-        if (tower.type.summons && stats.summons) {
+        // C-Base has its own summon manager in CBase.js, so skip the generic path
+        // here to avoid duplicate spawns and ignored field limits.
+        if (tower.type.summons && stats.summons && !tower.type.isCBase) {
             stats.summons.forEach(summon => {
                 const lastSummonTime = tower.lastSummonTimes[summon.type] || 0;
 
@@ -3227,9 +5533,14 @@ function updateTowers(timestamp) {
             }
         }
         // --- End Charger Tower Logic ---
+        else if (tower.type === TOWER_TYPES.COMMANDO) {
+            updateCommandoTower(tower, stats, timestamp);
+        } else if (tower.type === TOWER_TYPES.LUNAR_CUBE) {
+            updateLunarCubeTower(tower, stats, timestamp);
+        }
 
         // --- Attacker Tower Logic (also runs for hybrid towers like Executive) ---
-        else if ((!tower.type.summons || tower.type.isHybrid) && !tower.type.farm && !tower.type.support && stats.damage && stats.fireRate) {
+        else if ((!tower.type.summons || tower.type.isHybrid) && !tower.type.farm && !tower.type.support && !tower.type.isMafia && stats.damage && stats.fireRate) {
             // Get Commander buffs (unless tower cannot be buffed)
             const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);
             const rangeBonus = tower.type.rangeBonus || 0;
@@ -3388,22 +5699,40 @@ function updateTowers(timestamp) {
 // Apply damage with resistance calculation
 // Damage types: 'bullet', 'laser', 'piercing', 'explosive', 'normal'
 // Piercing damage bypasses global resistance
-function applyDamage(enemy, damage, damageType = 'bullet') {
+function applyDamage(enemy, damage, damageType = 'bullet', summonDamageType = null, options = {}) {
+    if ((enemy.invulnerableUntil || 0) > performance.now()) {
+        return 0;
+    }
+
     let finalDamage = damage;
+
+    if (enemy.hasDroneSight) {
+        finalDamage *= 1.1; // +10% damage
+    }
 
     // Check for resistances (support both enemy.type.resistances and legacy enemy.resistance)
     const resistances = enemy.type?.resistances || enemy.resistance;
 
     if (resistances) {
         // Apply global resistance first (UNLESS piercing damage, which bypasses global)
-        if (resistances.global && damageType !== 'piercing') {
-            finalDamage *= (1 - resistances.global);
+        const adjustedGlobal = getAgentAdjustedResistance(resistances.global || 0, enemy);
+        if (adjustedGlobal && damageType !== 'piercing') {
+            finalDamage *= (1 - adjustedGlobal);
         }
 
         // Apply specific damage type resistance (supports negative = amplification)
         if (resistances[damageType] !== undefined) {
-            finalDamage *= (1 - resistances[damageType]);
+            finalDamage *= (1 - getAgentAdjustedResistance(resistances[damageType], enemy));
         }
+
+        if (summonDamageType && resistances[summonDamageType] !== undefined) {
+            finalDamage *= (1 - getAgentAdjustedResistance(resistances[summonDamageType], enemy));
+        }
+    }
+
+    const indexVulnerability = getAgentIndexVulnerability(enemy);
+    if (indexVulnerability > 0) {
+        finalDamage *= (1 + indexVulnerability);
     }
 
     // Apply damage to shield first, then HP
@@ -3421,15 +5750,45 @@ function applyDamage(enemy, damage, damageType = 'bullet') {
     // Apply remaining damage to HP
     enemy.hp -= remainingDamage;
 
+    // Bounty kill reward — pays out when the marked enemy dies
+    if (enemy._mafiaBounty && enemy.hp <= 0) {
+        const reward = enemy._mafiaBountyReward || 0;
+        if (reward > 0) {
+            cash += reward;
+            updateCashDisplay();
+            // Gold popup
+            const div = document.createElement('div');
+            div.style.cssText = `position:fixed;left:${enemy.x}px;top:${enemy.y - 30}px;color:#FFD700;font-size:18px;font-weight:bold;pointer-events:none;z-index:9999;text-shadow:0 0 8px #FFD700;`;
+            div.textContent = `💰 BOUNTY +$${reward}`;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 2000);
+        }
+        enemy._mafiaBounty = false;
+    }
+
     // Award tiered percentage of damage dealt as cash (only for non-summon enemies)
-    if (!enemy.isSummon && finalDamage > 0) {
-        let cashPercentage = 0.10;
-        if (finalDamage > 50000) {
-            cashPercentage = 0.01;
-        } else if (finalDamage > 10000) {
+    if (!enemy.isSummon && finalDamage > 0 && !options.suppressCash) {
+        let cashPercentage;
+        if (finalDamage <= 500) {
+            cashPercentage = 0.08;
+        } else if (finalDamage <= 2000) {
+            cashPercentage = 0.06;
+        } else if (finalDamage <= 5000) {
+            cashPercentage = 0.045;
+        } else if (finalDamage <= 10000) {
             cashPercentage = 0.03;
-        } else if (finalDamage > 2000) {
-            cashPercentage = 0.05;
+        } else if (finalDamage <= 25000) {
+            cashPercentage = 0.02;
+        } else if (finalDamage <= 50000) {
+            cashPercentage = 0.012;
+        } else if (finalDamage <= 100000) {
+            cashPercentage = 0.008;
+        } else if (finalDamage <= 250000) {
+            cashPercentage = 0.005;
+        } else if (finalDamage <= 500000) {
+            cashPercentage = 0.003;
+        } else {
+            cashPercentage = 0.001;
         }
         const cashOnHit = Math.floor(finalDamage * cashPercentage);
         if (cashOnHit > 0) {
@@ -3442,32 +5801,13 @@ function applyDamage(enemy, damage, damageType = 'bullet') {
 
 // Find target
 function findTarget(tower) {
-    const stats = tower.type.levels[tower.level - 1];
-    const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
-    const rangeBonus = tower.type.rangeBonus || 0;
-    const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
-    const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
-
-    let furthestEnemy = null;
-    let maxDistanceTraveled = -Infinity;
-    for (const enemy of enemies) {
-        if (enemy.hp > 0 && !enemy.isSummon) {
-            const sqDist = calculateDistanceSq(tower.x, tower.y, enemy.x, enemy.y);
-            if (sqDist <= sqRange && enemy.distanceTraveled > maxDistanceTraveled) {
-                furthestEnemy = enemy;
-                maxDistanceTraveled = enemy.distanceTraveled;
-            }
-        }
-    }
-    return furthestEnemy;
+    const rangePx = getTowerEffectiveRange(tower) * GRID_SIZE;
+    return findBestEnemyInRange(tower.x, tower.y, rangePx);
 }
 
 // Check if in range
 function isInRange(tower, target) {
-    const stats = tower.type.levels[tower.level - 1];
-    const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0 } : getCommanderBuffs(tower);
-    const rangeBonus = tower.type.rangeBonus || 0;
-    const buffedRange = stats.range + buffs.rangeBoost + rangeBonus;
+    const buffedRange = getTowerEffectiveRange(tower);
     const sqRange = (buffedRange * GRID_SIZE) * (buffedRange * GRID_SIZE);
 
     return calculateDistanceSq(tower.x, tower.y, target.x, target.y) <= sqRange;
@@ -3492,6 +5832,12 @@ function hexToRgba(hex, alpha) {
     // Handle hex with or without # and with optional alpha (8 char hex)
     hex = hex.replace('#', '');
 
+    // Guard: if not valid hex chars, treat as opaque fallback
+    if (!/^[0-9A-Fa-f]{3,8}$/.test(hex)) return `rgba(128, 128, 128, ${alpha})`;
+
+    // Expand shorthand (#RGB → RRGGBB)
+    if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+
     // Take only RGB portion (first 6 chars) if hex is longer (like #ffffffff)
     if (hex.length > 6) hex = hex.substring(0, 6);
 
@@ -3515,6 +5861,8 @@ function drawTowers() {
             towerSizeX = 3; towerSizeY = 3; // 3x3 tower
         } else if (tower.type === TOWER_TYPES.CARRIER_CUBE) {
             towerSizeX = 4; towerSizeY = 4; // 4x4 tower
+        } else if (tower.type === TOWER_TYPES.CBASE) {
+            towerSizeX = 5; towerSizeY = 5; // 5x5 tower
         }
 
         // Draw the tower's main body
@@ -3529,6 +5877,34 @@ function drawTowers() {
             ctx.fillText(`R${tower.level}`, tower.gridX * GRID_SIZE + (towerSizeX * GRID_SIZE) / 2, tower.gridY * GRID_SIZE + (towerSizeY * GRID_SIZE) / 2 + 4);
         } else {
             ctx.fillText(tower.level, tower.gridX * GRID_SIZE + (towerSizeX * GRID_SIZE) / 2, tower.gridY * GRID_SIZE + (towerSizeY * GRID_SIZE) / 2 + 4);
+        }
+
+        if (isTowerStunned(tower)) {
+            const footprint = getTowerFootprint(tower);
+            const pulse = 0.45 + Math.sin(performance.now() / 120) * 0.15;
+            const remaining = getTowerStunRemainingMs(tower) / 1000;
+
+            ctx.save();
+            ctx.fillStyle = `rgba(235, 247, 255, ${0.12 + pulse * 0.2})`;
+            ctx.fillRect(footprint.left, footprint.top, footprint.widthPx, footprint.heightPx);
+            ctx.strokeStyle = `rgba(232, 247, 255, ${0.55 + pulse * 0.25})`;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(footprint.left - 3, footprint.top - 3, footprint.widthPx + 6, footprint.heightPx + 6);
+
+            ctx.strokeStyle = `rgba(190, 225, 255, ${0.7 + pulse * 0.2})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(footprint.left, footprint.top);
+            ctx.lineTo(footprint.left + footprint.widthPx, footprint.top + footprint.heightPx);
+            ctx.moveTo(footprint.left + footprint.widthPx, footprint.top);
+            ctx.lineTo(footprint.left, footprint.top + footprint.heightPx);
+            ctx.stroke();
+
+            ctx.fillStyle = '#F4FBFF';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`STUN ${remaining.toFixed(1)}s`, tower.x, footprint.top - 8);
+            ctx.restore();
         }
     }
 }
@@ -3608,13 +5984,33 @@ function updateProjectiles(timestamp) {
 function updateEnemies(timestamp) {
     for (let i = enemies.length - 1; i >= 0; i--) {
         const entity = enemies[i];
+        if (!entity) continue;
         if (entity.hp <= 0) {
-            if (entity.type.cashReward) {
-                cash += Math.floor(entity.type.cashReward * 0.75);
-            } else {
-                cash += Math.floor(entity.maxHp * (entity.type.isKing ? 0.03 : 0.06) * 0.75);
+            if (entity.isCBaseSummon && typeof cbase_try_trigger_omega_explosion === 'function' && cbase_try_trigger_omega_explosion(entity, timestamp)) {
+                continue;
             }
-            if (entity.type.selfDestructDamage) {
+            if (!entity.isSummon && entity.type.name === 'THE OMEGA CUBE') {
+                tryActivateSecretWaveFromOmegaDeath();
+            }
+            if (entity.isCBaseSummon && typeof cbase_on_unit_death === 'function') {
+                cbase_on_unit_death(entity, timestamp);
+            }
+            if (!entity.isSummon && typeof cbase_on_marked_enemy_death === 'function') {
+                cbase_on_marked_enemy_death(entity, timestamp);
+            }
+            if (!entity.isSummon) {
+                processAgentIndexKill(entity);
+            }
+            if (entity.isDroneBounty && typeof droneUnit !== 'undefined' && droneUnit && droneUnit.active) {
+                droneUnit.bountyDebuffStack = -0.10;
+                droneUnit.bountyDebuffEndTime = timestamp + 5000;
+            }
+            if (entity.type.cashReward) {
+                cash += Math.floor(entity.type.cashReward * 0.50);
+            } else {
+                cash += Math.floor(entity.maxHp * (entity.type.isKing ? 0.02 : 0.035));
+            }
+            if (entity.type.selfDestructDamage && !entity.isCBaseSummon) {
                 enemies.forEach(enemy => {
                     if (!enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= 2 * GRID_SIZE) {
                         const damage = entity.type.selfDestructDamage;
@@ -3623,6 +6019,19 @@ function updateEnemies(timestamp) {
                 });
                 explosions.push({ x: entity.x, y: entity.y, size: 0, maxSize: 2 * GRID_SIZE * 2, startTime: timestamp, duration: 500 });
             }
+            if (!entity.isSummon && entity.type.name === 'Lunar Cube') {
+                damageFriendlyUnitsInSquare(entity.x, entity.y, 3, 2500, 'explosive');
+                applyTowerStunInSquare(entity.x, entity.y, 3, 4000, {
+                    now: timestamp,
+                    stack: true,
+                    maxDuration: 7000,
+                    source: 'lunar_cube_death'
+                });
+                createColoredExplosionEffect(entity.x, entity.y, 3, timestamp, 600, '#E8F6FF', '#FFFFFF');
+            }
+            if (!entity.isSummon && entity.type.name === 'The Moon Cube') {
+                stopSecretWaveBossMusic();
+            }
             enemies.splice(i, 1);
             updateCashDisplay();
             continue;
@@ -3630,6 +6039,12 @@ function updateEnemies(timestamp) {
 
         // START OF REPLACED BLOCK
         if (entity.isSummon) {
+            // C-Base summons are fully handled by update_cbase_units — skip generic pipe
+            if (entity.isCBaseSummon) {
+                // Remove unit if it walked off the start of the path
+                if (entity.distanceTraveled <= 0) enemies.splice(i, 1);
+                continue;
+            }
             // Step 1: Find target and process attacks
             const target = findSummonTarget(entity);
             if (target) {
@@ -3649,14 +6064,14 @@ function updateEnemies(timestamp) {
                 const targetForKamikaze = findSummonTarget(entity); // Re-find target after movement
                 if (targetForKamikaze && calculateDistance(entity.x, entity.y, targetForKamikaze.x, targetForKamikaze.y) <= entity.size + targetForKamikaze.size) {
                     // Collision damage
-                    applyDamage(targetForKamikaze, entity.type.collisionDamage);
+                    applyDamage(targetForKamikaze, entity.type.collisionDamage, 'bullet', 'summonerCollision');
                     entity.hp = 0; // Kill the kamikaze cube
                 }
                 // Death explosion
                 if (entity.hp <= 0) {
                     enemies.forEach(enemy => {
                         if (!enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.deathRange * GRID_SIZE) {
-                            applyDamage(enemy, entity.type.deathDamage, 'explosive');
+                            applyDamage(enemy, entity.type.deathDamage, 'explosive', 'summonerRange');
                         }
                     });
                     explosions.push({ x: entity.x, y: entity.y, size: 0, maxSize: entity.type.deathRange * GRID_SIZE, startTime: timestamp, duration: 500 });
@@ -3669,13 +6084,14 @@ function updateEnemies(timestamp) {
         }
         // END OF REPLACED BLOCK
         else {
+            const secretWaveAiState = updateSecretWaveEnemy(entity, timestamp);
             // ═══════════════════════════════════════════════════════════════
             // NIGHTMARE MODE MECHANICS
             // ═══════════════════════════════════════════════════════════════
 
             // --- SUMMONER ENEMIES ---
             // Enemies with isSummoner flag spawn minions on a cooldown
-            if (entity.type.isSummoner && !entity.isSummon) {
+            if (entity.type.isSummoner && !entity.isSummon && !isAgentHijackBlocked(entity) && !secretWaveAiState.disableDefaultSummoner) {
                 if (!entity.lastSummonTime) entity.lastSummonTime = timestamp;
 
                 if (timestamp - entity.lastSummonTime >= (entity.type.summoncooldown || 10000)) {
@@ -3790,9 +6206,22 @@ function updateEnemies(timestamp) {
             // ═══════════════════════════════════════════════════════════════
             // END NIGHTMARE MODE MECHANICS
             // ═══════════════════════════════════════════════════════════════
+            const previousSpeed = entity.speed;
+            let effectiveSpeed = previousSpeed;
+            if ((entity.commandoStunUntil || 0) > timestamp || (entity.agentStunUntil || 0) > timestamp) {
+                effectiveSpeed = 0;
+            } else {
+                if ((entity.commandoSlowUntil || 0) > timestamp) {
+                    effectiveSpeed *= (1 - (entity.commandoSlowAmount || 0));
+                }
+                effectiveSpeed *= getAgentSlowMultiplier(entity, timestamp);
+            }
 
-
-            moveEntity(entity, false);
+            entity.speed = effectiveSpeed;
+            if (!secretWaveAiState.skipMovement) {
+                moveEntity(entity, false);
+            }
+            entity.speed = previousSpeed;
             if (entity.distanceTraveled >= getPathLength()) {
                 // damageBase returns true if the enemy should be removed, false if it looped
                 const shouldRemove = damageBase(entity);
@@ -3812,7 +6241,7 @@ function handleSummonAttacks(entity, target, timestamp) {
         // Minigun attack
         if (timestamp - entity.lastFired >= entity.type.minigunFireRate) {
             const damage = entity.type.minigunDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'bullet', 'summonerRange');
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'cyan', width: 1, startTime: timestamp, duration: 100 });
             entity.lastFired = timestamp;
         }
@@ -3834,7 +6263,7 @@ function handleSummonAttacks(entity, target, timestamp) {
         // Railgun attack
         if (timestamp - entity.lastRailgun >= entity.type.railgunFireRate) {
             const damage = entity.type.railgunDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'piercing', 'summonerRange');
             railgunShots.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, alpha: 1, startTime: timestamp, duration: 500 });
             entity.lastRailgun = timestamp;
         }
@@ -3844,7 +6273,7 @@ function handleSummonAttacks(entity, target, timestamp) {
             enemies.forEach(enemy => {
                 if (!enemy.isSummon && calculateDistance(target.x, target.y, enemy.x, enemy.y) <= aoeRange * GRID_SIZE) {
                     const damage = enemy === target ? (entity.type.directDamage || entity.type.damage) : entity.type.damage;
-                    applyDamage(enemy, damage, 'explosive');
+                    applyDamage(enemy, damage, 'explosive', 'summonerRange');
                 }
             });
             explosions.push({ x: target.x, y: target.y, size: 0, maxSize: aoeRange * GRID_SIZE, startTime: timestamp, duration: 500 });
@@ -3852,7 +6281,7 @@ function handleSummonAttacks(entity, target, timestamp) {
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: projectileColor, width: 2, startTime: timestamp, duration: 200 });
         } else { // Blue Square, Pink Square, Green Square, Beta Gray, Elite Operator, Exec Tank
             const damage = entity.type.damage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'bullet', 'summonerRange');
             if (entity.type.name === 'Green Square') {
                 railgunShots.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, alpha: 1, startTime: timestamp, duration: 500 });
             } else if (entity.type.name.includes('Blue Square')) {
@@ -3871,7 +6300,7 @@ function handleSummonAttacks(entity, target, timestamp) {
         entity.burstCountRemaining = entity.burstCountRemaining || entity.type.burstCount;
         if (entity.burstCountRemaining > 0 && timestamp - (entity.lastBurstShot || 0) >= entity.type.burstFireRate) {
             const damage = entity.type.burstDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'bullet', 'summonerRange');
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'pink', width: 2, startTime: timestamp, duration: 50 });
             entity.burstCountRemaining--;
             entity.lastBurstShot = timestamp;
@@ -3892,7 +6321,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
     // Minigun attack
     if (timestamp - entity.lastFired >= entity.type.minigunFireRate) {
         const damage = entity.type.minigunDamage;
-        applyDamage(target, damage);
+        applyDamage(target, damage, 'bullet', 'summonerRange');
         projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'yellow', width: 1, startTime: timestamp, duration: 50 });
         entity.lastFired = timestamp;
     }
@@ -3902,7 +6331,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
         entity.railgunCountRemaining = entity.railgunCountRemaining || entity.type.railgunCount;
         if (entity.railgunCountRemaining > 0 && timestamp - (entity.lastRailgunShot || 0) >= entity.type.railgunFireRate) {
             const damage = entity.type.railgunDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'piercing', 'summonerRange');
             railgunShots.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, alpha: 1, startTime: timestamp, duration: 500 });
             entity.railgunCountRemaining--;
             entity.lastRailgunShot = timestamp;
@@ -3920,7 +6349,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
             enemies.forEach(enemy => {
                 if (!enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.range * GRID_SIZE) {
                     const damage = enemy === target ? entity.type.missileDirectDamage : entity.type.missileDamage;
-                    applyDamage(enemy, damage, 'explosive');
+                    applyDamage(enemy, damage, 'explosive', 'summonerRange');
                 }
             });
             explosions.push({ x: target.x, y: target.y, size: 0, maxSize: GRID_SIZE * 2, startTime: timestamp, duration: 500 });
@@ -3939,7 +6368,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
         entity.laserCountRemaining = entity.laserCountRemaining || entity.type.laserBurstCount;
         if (entity.laserCountRemaining > 0 && timestamp - (entity.lastLaserShot || 0) >= entity.type.laserFireRate) {
             const damage = entity.type.laserDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'laser', 'summonerRange');
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'red', width: 2, startTime: timestamp, duration: 40 });
             entity.laserCountRemaining--;
             entity.lastLaserShot = timestamp;
@@ -3955,7 +6384,7 @@ function handleRainbowCubeAttacks(entity, target, timestamp) {
         entity.mainRailgunCountRemaining = entity.mainRailgunCountRemaining || entity.type.mainRailgunCount;
         if (entity.mainRailgunCountRemaining > 0 && timestamp - (entity.lastMainRailgunShot || 0) >= entity.type.mainRailgunFireRate) {
             const damage = entity.type.mainRailgunDamage;
-            applyDamage(target, damage);
+            applyDamage(target, damage, 'piercing', 'summonerRange');
             railgunShots.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, alpha: 1, startTime: timestamp, duration: 500 });
             entity.mainRailgunCountRemaining--;
             entity.lastMainRailgunShot = timestamp;
@@ -4010,28 +6439,13 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
 
             if (closestBoss) {
                 // Deal knockback damage to the *single* closest boss
-                applyDamage(closestBoss, entity.type.knockbackDirectDamage, 'explosive');
+                applyDamage(closestBoss, entity.type.knockbackDirectDamage, 'explosive', 'summonerRange');
 
                 // KNOCKBACK MOVEMENT: Reduce distanceTraveled for the single boss
-                const knockbackDistance = entity.type.knockbackPower * GRID_SIZE; // Use knockbackPower from entity type
-                closestBoss.distanceTraveled = Math.max(0, closestBoss.distanceTraveled - knockbackDistance);
-
-                // Instantly update boss position after knockback
-                let distanceAlongPath = closestBoss.distanceTraveled;
-                let currentLength = 0;
-                for (let i = 0; i < path.length - 1; i++) {
-                    const segmentLength = calculateDistance(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y);
-                    if (distanceAlongPath <= currentLength + segmentLength) {
-                        const t = (distanceAlongPath - currentLength) / segmentLength;
-                        closestBoss.x = path[i].x + t * (path[i + 1].x - path[i].x);
-                        closestBoss.y = path[i].y + t * (path[i + 1].y - path[i].y);
-                        break;
-                    }
-                    currentLength += segmentLength;
-                }
-                if (distanceAlongPath <= 0) { // If knocked back to start, set to start point
-                    closestBoss.x = path[0].x;
-                    closestBoss.y = path[0].y;
+                if (!closestBoss.type.cannotBeKnockedBack) {
+                    const knockbackDistance = entity.type.knockbackPower * GRID_SIZE; // Use knockbackPower from entity type
+                    closestBoss.distanceTraveled = Math.max(0, closestBoss.distanceTraveled - knockbackDistance);
+                    setEntityPathPosition(closestBoss, closestBoss.distanceTraveled, false);
                 }
 
                 // Create explosion effect (visual for the knockback)
@@ -4047,7 +6461,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
                 // Deal AOE damage to nearby non-boss enemies around the factory cube
                 enemies.forEach(enemy => {
                     if (!enemy.isSummon && !enemy.type.isBoss && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.knockbackExplosionRange * GRID_SIZE) {
-                        applyDamage(enemy, entity.type.knockbackExplosionDamage, 'explosive');
+                        applyDamage(enemy, entity.type.knockbackExplosionDamage, 'explosive', 'summonerRange');
                     }
                 });
 
@@ -4058,7 +6472,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
 
         // ----- Minigun Attack -----
         if (entity.type.minigunDamage && timestamp - entity.lastMinigunFire >= entity.type.minigunFireRate) {
-            applyDamage(target, entity.type.minigunDamage);
+            applyDamage(target, entity.type.minigunDamage, 'bullet', 'summonerRange');
             projectiles.push({ x1: entity.x, y1: entity.y, x2: target.x, y2: target.y, color: 'yellow', width: 1, startTime: timestamp, duration: 50 });
             entity.lastMinigunFire = timestamp;
         }
@@ -4070,7 +6484,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
                 enemies.forEach(enemy => {
                     if (!enemy.isSummon && calculateDistance(entity.x, entity.y, enemy.x, enemy.y) <= entity.type.rocketAOERange * GRID_SIZE) {
                         const damage = enemy === target ? entity.type.rocketDirectDamage : entity.type.rocketDamage;
-                        applyDamage(enemy, damage, 'explosive');
+                        applyDamage(enemy, damage, 'explosive', 'summonerRange');
                     }
                 });
                 explosions.push({ x: target.x, y: target.y, size: 0, maxSize: entity.type.rocketAOERange * GRID_SIZE, startTime: timestamp, duration: 200 });
@@ -4096,7 +6510,7 @@ function handleFactoryCubeAttacks(entity, target, timestamp) {
                 }
             }
             if (strongestEnemy) {
-                applyDamage(strongestEnemy, entity.type.railgunDamage);
+                applyDamage(strongestEnemy, entity.type.railgunDamage, 'piercing', 'summonerRange');
                 railgunShots.push({ x1: entity.x, y1: entity.y, x2: strongestEnemy.x, y2: strongestEnemy.y, alpha: 1, startTime: timestamp, duration: 500 });
                 entity.lastRailgunFire = timestamp;
             }
@@ -4122,8 +6536,13 @@ function moveEntity(entity, isSummon) {
     const direction = isSummon ? -1 : 1;
     entity.distanceTraveled += entity.speed * direction * (frameDelta / 16.667);
     entity.distanceTraveled = Math.max(0, Math.min(entity.distanceTraveled, pathLength));
+    setEntityPathPosition(entity, entity.distanceTraveled, isSummon);
+}
 
-    let distanceAlongPath = isSummon ? pathLength - entity.distanceTraveled : entity.distanceTraveled;
+function setEntityPathPosition(entity, distanceTraveled, isSummon = false) {
+    const pathLength = getPathLength();
+    const clampedDistance = Math.max(0, Math.min(distanceTraveled, pathLength));
+    let distanceAlongPath = isSummon ? pathLength - clampedDistance : clampedDistance;
     let currentLength = 0;
 
     if (isSummon) {
@@ -4133,7 +6552,7 @@ function moveEntity(entity, isSummon) {
                 const t = (distanceAlongPath - currentLength) / segmentLength;
                 entity.x = path[i].x + t * (path[i - 1].x - path[i].x);
                 entity.y = path[i].y + t * (path[i - 1].y - path[i].y);
-                break;
+                return;
             }
             currentLength += segmentLength;
         }
@@ -4141,22 +6560,22 @@ function moveEntity(entity, isSummon) {
             entity.x = path[0].x;
             entity.y = path[0].y;
         }
-    } else {
-        for (let i = 0; i < path.length - 1; i++) {
-            const segmentLength = calculateDistance(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y);
-            if (distanceAlongPath <= currentLength + segmentLength) {
-                const t = (distanceAlongPath - currentLength) / segmentLength;
-                entity.x = path[i].x + t * (path[i + 1].x - path[i].x);
-                entity.y = path[i].y + t * (path[i + 1].y - path[i].y);
-                break;
-            }
-            currentLength += segmentLength;
-        }
-        if (distanceAlongPath >= pathLength) {
-            entity.x = path[path.length - 1].x;
-            entity.y = path[path.length - 1].y;
-        }
+        return;
     }
+
+    for (let i = 0; i < path.length - 1; i++) {
+        const segmentLength = calculateDistance(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y);
+        if (distanceAlongPath <= currentLength + segmentLength) {
+            const t = (distanceAlongPath - currentLength) / segmentLength;
+            entity.x = path[i].x + t * (path[i + 1].x - path[i].x);
+            entity.y = path[i].y + t * (path[i + 1].y - path[i].y);
+            return;
+        }
+        currentLength += segmentLength;
+    }
+
+    entity.x = path[path.length - 1].x;
+    entity.y = path[path.length - 1].y;
 }
 
 // Find summon target
@@ -4181,7 +6600,7 @@ function fireSummonMissile(summon, target, timestamp) {
     enemies.forEach(enemy => {
         if (!enemy.isSummon && calculateDistance(summon.x, summon.y, enemy.x, enemy.y) <= summon.type.missileRange * GRID_SIZE) {
             const damage = enemy === target ? summon.type.missileDirectDamage : summon.type.missileAOEDamage;
-            applyDamage(enemy, damage, 'explosive');
+            applyDamage(enemy, damage, 'explosive', 'summonerRange');
         }
     });
     explosions.push({
@@ -4199,12 +6618,28 @@ function handleRam(summon, summonIndex) {
     let ramOccurred = false;
     for (let i = enemies.length - 1; i >= 0 && !ramOccurred; i--) {
         const enemy = enemies[i];
+        if (!enemy || enemy === summon) continue;
         if (!enemy.isSummon && calculateDistance(summon.x, summon.y, enemy.x, enemy.y) < (summon.size + enemy.size) / 2) {
             const damage = Math.min(summon.hp, enemy.hp);
             summon.hp -= damage;
-            applyDamage(enemy, damage);
-            if (summon.hp <= 0) enemies.splice(summonIndex, 1);
-            if (enemy.hp <= 0) enemies.splice(i, 1);
+            applyDamage(enemy, damage, 'bullet', 'summonerCollision');
+            if (summon.hp <= 0) {
+                if (summon.isCBaseSummon && typeof cbase_try_trigger_omega_explosion === 'function' && cbase_try_trigger_omega_explosion(summon, performance.now())) {
+                    ramOccurred = true;
+                    continue;
+                }
+                // C-Base unit death hook
+                if (summon.isCBaseSummon && typeof cbase_on_unit_death === 'function') {
+                    cbase_on_unit_death(summon, performance.now(), enemy);
+                }
+                enemies.splice(summonIndex, 1);
+            }
+            if (enemy.hp <= 0) {
+                if (!enemy.isSummon && typeof cbase_on_marked_enemy_death === 'function') {
+                    cbase_on_marked_enemy_death(enemy, performance.now());
+                }
+                enemies.splice(i, 1);
+            }
             ramOccurred = true;
         }
     }
@@ -4226,9 +6661,16 @@ function updateExplosions(timestamp) {
 // Draw explosions
 function drawExplosions() {
     for (const explosion of explosions) {
-        ctx.fillStyle = 'rgba(255, 165, 0, 0.5)';
+        const elapsed = performance.now() - explosion.startTime;
+        const t = Math.max(0, 1 - elapsed / explosion.duration);
+        const alpha = t * 0.65;
+        ctx.fillStyle = explosion.outerColor ? hexToRgba(explosion.outerColor, alpha) : `rgba(255, 165, 0, ${alpha})`;
         const halfSize = explosion.size / 2;
         ctx.fillRect(explosion.x - halfSize, explosion.y - halfSize, explosion.size, explosion.size);
+        // Inner brighter core
+        ctx.fillStyle = explosion.innerColor ? hexToRgba(explosion.innerColor, alpha * 0.5) : `rgba(255, 240, 100, ${alpha * 0.5})`;
+        const coreSize = halfSize * 0.5;
+        ctx.fillRect(explosion.x - coreSize, explosion.y - coreSize, coreSize * 2, coreSize * 2);
     }
 }
 
@@ -4262,6 +6704,14 @@ function drawSpawnTimer() {
             } else {
                 // Show individual spawn rate timer
                 const lastSummonTime = tower.lastSummonTimes[summon.type] || 0;
+                const timeSinceLastSpawn = performance.now() - lastSummonTime;
+                timeUntilNextSpawn = Math.max(0, summon.spawnRate - timeSinceLastSpawn);
+            }
+        } else if (tower.type.isCBase) {
+            const lastSummonTime = tower.cbaseSpawnTimers ? tower.cbaseSpawnTimers[summon.type] : undefined;
+            if (lastSummonTime === undefined) {
+                timeUntilNextSpawn = summon.spawnRate;
+            } else {
                 const timeSinceLastSpawn = performance.now() - lastSummonTime;
                 timeUntilNextSpawn = Math.max(0, summon.spawnRate - timeSinceLastSpawn);
             }
@@ -4313,7 +6763,78 @@ function drawEntities() {
             ctx.fillStyle = entity.type.color;
         }
         const size = entity.type.size;
+        if (entity.type.name.startsWith('Lunar') || entity.type.name === 'The Moon Cube') {
+            const glow = ctx.createRadialGradient(entity.x, entity.y, size * 0.2, entity.x, entity.y, size * 1.35);
+            glow.addColorStop(0, 'rgba(255,255,255,0.24)');
+            glow.addColorStop(0.5, 'rgba(207,234,255,0.14)');
+            glow.addColorStop(1, 'rgba(207,234,255,0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y, size * 1.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = entity.type.name === 'The Moon Cube' ? '#F4FBFF' : entity.type.color;
+        }
         ctx.fillRect(entity.x - size / 2, entity.y - size / 2, size, size);
+
+        if (entity.type.name === 'The Moon Cube') {
+            const now = performance.now();
+            const activeOrbs = getActiveMoonOrbCount(entity, now);
+            const orbRadius = size * 0.95;
+            const baseAngle = now / 320;
+
+            for (let orbIndex = 0; orbIndex < activeOrbs; orbIndex++) {
+                const angle = baseAngle + (Math.PI * 2 * orbIndex / 3);
+                const orbX = entity.x + Math.cos(angle) * orbRadius;
+                const orbY = entity.y + Math.sin(angle) * orbRadius;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(orbX, orbY, size * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(215,240,255,0.9)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            if (entity.moonDashState === 'charge') {
+                const dashPreview = { x: entity.x, y: entity.y };
+                setEntityPathPosition(dashPreview, entity.moonDashTargetDistance || entity.distanceTraveled, false);
+                const pulse = 0.45 + Math.sin(now / 90) * 0.2;
+                ctx.strokeStyle = `rgba(255,255,255,${0.5 + pulse})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 6]);
+                ctx.beginPath();
+                ctx.moveTo(entity.x, entity.y);
+                ctx.lineTo(dashPreview.x, dashPreview.y);
+                ctx.stroke();
+                ctx.strokeRect(dashPreview.x - size * 0.45, dashPreview.y - size * 0.45, size * 0.9, size * 0.9);
+                ctx.setLineDash([]);
+            }
+
+            if (entity.moonMergeOrb) {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(entity.moonMergeOrb.currentX, entity.moonMergeOrb.currentY, size * 0.22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(220, 243, 255, 0.95)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(entity.x, entity.y);
+                ctx.lineTo(entity.moonMergeOrb.currentX, entity.moonMergeOrb.currentY);
+                ctx.stroke();
+            }
+        }
+
+        if ((entity.invulnerableUntil || 0) > performance.now()) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 5]);
+            ctx.strokeRect(entity.x - size * 0.65, entity.y - size * 0.65, size * 1.3, size * 1.3);
+            ctx.setLineDash([]);
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // SHIELD BUBBLE VISUAL
@@ -4350,6 +6871,22 @@ function drawEntities() {
         // ═══════════════════════════════════════════════════════════════
         // END SHIELD BUBBLE VISUAL
         // ═══════════════════════════════════════════════════════════════
+
+        // DRONE SIGHT VISUAL (Eye Icon)
+        if (entity.hasDroneSight) {
+            const eyeSize = entity.isDroneBounty ? 12 : 8;
+            ctx.fillStyle = entity.isDroneBounty ? '#ff0000' : '#ffaa00';
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y - size / 2 - 18, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y - size / 2 - 18, eyeSize * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // Show HP bar on hover for normal enemies (not bosses with showHpBar)
         if (hoveredEnemy === entity && !entity.type.showHpBar) {
@@ -4546,26 +7083,28 @@ function damageBase(enemy) {
             enemy.x = path[0].x;
             enemy.y = path[0].y;
 
-            // Spawn 2 Omega Summons on each loop
-            const omegaSummonType = ENEMY_TYPES.omegasummon_nm;
-            if (omegaSummonType) {
-                for (let j = 0; j < 2; j++) {
+            const loopSummonTypeKey = enemy.type.loopSummonType;
+            const loopSummonCount = enemy.type.loopSummonCount || 0;
+            const loopSummonType = loopSummonTypeKey ? ENEMY_TYPES[loopSummonTypeKey] : null;
+            if (loopSummonType && loopSummonCount > 0 && !isAgentHijackBlocked({ type: enemy.type })) {
+                for (let j = 0; j < loopSummonCount; j++) {
+                    const offset = (j - (loopSummonCount - 1) / 2) * 30;
                     const newEnemy = {
-                        type: omegaSummonType,
-                        x: enemy.x + (j * 30), // Slight offset
+                        type: loopSummonType,
+                        x: enemy.x + offset,
                         y: enemy.y,
-                        hp: omegaSummonType.baseHp,
-                        maxHp: omegaSummonType.baseHp,
-                        shield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
-                        maxShield: omegaSummonType.hasShield ? omegaSummonType.shieldHp : 0,
-                        speed: omegaSummonType.speed,
+                        hp: loopSummonType.baseHp,
+                        maxHp: loopSummonType.baseHp,
+                        shield: loopSummonType.hasShield ? loopSummonType.shieldHp : 0,
+                        maxShield: loopSummonType.hasShield ? loopSummonType.shieldHp : 0,
+                        speed: loopSummonType.speed,
                         distanceTraveled: 0,
-                        size: omegaSummonType.size,
+                        size: loopSummonType.size,
                         isSummoned: true
                     };
                     enemies.push(newEnemy);
                 }
-                console.log(`Omega Boss spawned 2 Omega Summons!`);
+                console.log(`${enemy.type.name} spawned ${loopSummonCount} loop summons!`);
             }
 
             // Don't damage base - return false so enemy is NOT removed from array
@@ -4582,19 +7121,32 @@ function damageBase(enemy) {
     const currentHp = Number.isFinite(enemy.hp) ? Math.max(0, enemy.hp) : maxHp;
     const hpRatio = Math.max(0, Math.min(1, currentHp / maxHp));
     const damage = Math.max(1, Math.floor(currentHp));
+
+    if (enemy.isDroneBounty && typeof droneUnit !== 'undefined' && droneUnit && droneUnit.active) {
+        droneUnit.bountyDebuffStack = -0.10;
+        droneUnit.bountyDebuffEndTime = performance.now() + 5000;
+    }
+
     baseHp -= damage;
     if (baseHp <= 0 && !isGameOver) gameOver();
     baseHpDisplay.textContent = Math.max(0, baseHp);
+    // Flash HP display red + play sound
+    window.sfxBaseDamage();
+    baseHpDisplay.classList.remove('hud-dmg');
+    void baseHpDisplay.offsetWidth;
+    baseHpDisplay.classList.add('hud-dmg');
 }
 
 // Game over
 function gameOver() {
     if (isGameOver) return; // Prevent multiple triggers
     isGameOver = true;
+    stopSecretWaveBossMusic();
 
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
+    if (typeof clear_cbase_timeouts === 'function') clear_cbase_timeouts();
 
     // Clear carrier units
     if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
@@ -4605,9 +7157,11 @@ function gameOver() {
 
 // Game won
 function gameWon() {
+    stopSecretWaveBossMusic();
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
+    if (typeof clear_cbase_timeouts === 'function') clear_cbase_timeouts();
 
     // Clear carrier units
     if (typeof clearCarrierUnits === 'function') clearCarrierUnits();
@@ -4699,6 +7253,11 @@ function resetGame(newGame = false) {
     // Clear all Beta Protocol timeouts
     betaProtocolTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     betaProtocolTimeouts = [];
+    if (typeof clear_cbase_timeouts === 'function') clear_cbase_timeouts();
+
+    // Clear Drone
+    if (typeof clearDroneUnits === 'function') clearDroneUnits();
+    resetSecretWaveRunState();
 
     // Reset all game state variables
     if (currentGameMode.name === "Boss Rush" && newGame) {
@@ -4736,6 +7295,12 @@ function resetGame(newGame = false) {
     currentInfoTower = null;
     orbitalStrikeActive = false;
     orbitalStrikeData = null;
+    agentTargetingActive = false;
+    agentTargetingData = null;
+    agentHijackUntil = 0;
+    agentHijackMode = null;
+    agentSweeperEffects = [];
+    nextAgentSweeperId = 1;
     isGameOver = false; // Reset game over flag
 
     // Clear all Carrier Cube units
@@ -4782,8 +7347,9 @@ function checkWaveComplete() {
     if (waveActive && allWavesDone && noEnemiesLeft) {
         waveActive = false;
         waveTimer = 0;
+        window.sfxWaveComplete();
 
-        if (waveNumber >= currentGameMode.waves && currentGameMode.name !== 'Endless') {
+        if (waveNumber >= getCurrentModeWaveLimit() && currentGameMode.name !== 'Endless') {
             gameWon();
             return;
         }
@@ -4824,6 +7390,8 @@ function updateCarrierCubes(timestamp) {
         const levelStats = tower.type.levels[tower.level - 1];
         const emGain = levelStats.emGainPerSec || 1;
         const emCap = levelStats.emCap || tower.type.efficiencyCap || 20;
+
+        if (isTowerStunned(tower, timestamp)) return;
 
         if (timestamp - tower.lastEmUpdate >= 1000) {
             if (tower.em < emCap) {
@@ -4877,6 +7445,7 @@ function updateCarrierCubes(timestamp) {
 
 // Trigger Carrier Ability
 function triggerCarrierAbility(tower, unitType) {
+    if (isTowerStunned(tower)) return;
     // Initialize per-unit state tracking
     if (!tower.unitState) tower.unitState = {};
     if (!tower.unitState[unitType.name]) {
@@ -4978,12 +7547,17 @@ function handleCarrierCooldown(tower, unitType) {
     }
 }
 
+// cbase timers
+let cbase_last_passive_30s = 0;
+let cbase_last_syphon_5s = 0;
+
 // Carrier Targeting Mode
 let carrierTargetingMode = false;
 let carrierTargetingUnit = null;
 let carrierTargetingTower = null;
 
 function enterCarrierTargetingMode(tower, unitType) {
+    if (isTowerStunned(tower)) return;
     carrierTargetingMode = true;
     carrierTargetingUnit = unitType;
     carrierTargetingTower = tower;
@@ -4999,6 +7573,18 @@ function enterCarrierTargetingMode(tower, unitType) {
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
+
+        if (isTowerStunned(carrierTargetingTower)) {
+            const stunnedTowerStats = carrierTargetingTower.type.levels[carrierTargetingTower.level - 1];
+            const stunnedTowerEmCap = stunnedTowerStats.emCap || carrierTargetingTower.type.efficiencyCap || 20;
+            carrierTargetingTower.em = Math.min((carrierTargetingTower.em || 0) + (carrierTargetingUnit?.emCost || 0), stunnedTowerEmCap);
+            carrierTargetingMode = false;
+            carrierTargetingUnit = null;
+            carrierTargetingTower = null;
+            canvas.style.cursor = 'default';
+            canvas.removeEventListener('click', targetingHandler);
+            return;
+        }
 
         // Spawn unit at target
         spawnCarrierUnit(carrierTargetingUnit, carrierTargetingTower, mouseX, mouseY);

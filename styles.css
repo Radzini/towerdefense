@@ -1097,23 +1097,350 @@ body {
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
 }
 
-/* Responsive improvements */
-@media (max-width: 1400px) {
-    #towerPanel {
-        width: 240px;
+/* ===== SCREEN & HUD FEEDBACK ===== */
+
+/* HUD value pop — fires on cash/wave changes */
+@keyframes hud-pop {
+    0% {
+        transform: scale(1.45);
     }
 
-    #towerInfoPanel {
-        width: 280px;
+    60% {
+        transform: scale(0.97);
     }
 
-    #carrierSpawnPanel {
-        right: 300px;
-        width: 240px;
+    100% {
+        transform: scale(1);
+    }
+}
+
+.hud-pop {
+    animation: hud-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* HP bar damage flash — red pulse when base takes a hit */
+@keyframes hud-dmg {
+    0% {
+        color: #fff;
+        text-shadow: 0 0 20px #ff2222, 0 0 40px #ff0000;
+        transform: scale(1.5);
     }
 
-    .tower-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
+    100% {
+        color: #FF6B6B;
+        text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        transform: scale(1);
     }
+}
+
+.hud-dmg {
+    animation: hud-dmg 0.35s ease-out;
+}
+
+/* ===== WAVE START BANNER ===== */
+#waveBanner {
+    position: fixed;
+    top: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(5, 8, 20, 0.92);
+    border: 1px solid rgba(102, 126, 234, 0.5);
+    border-radius: 10px;
+    padding: 10px 44px 12px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    pointer-events: none;
+    box-shadow: 0 4px 30px rgba(102, 126, 234, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    animation: banner-in 2s ease forwards;
+}
+
+.wave-banner-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #667eea;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+.wave-banner-num {
+    font-size: 46px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 24px rgba(102, 126, 234, 0.7);
+}
+
+@keyframes banner-in {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px) scale(0.92);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0px) scale(1.02);
+    }
+
+    20% {
+        transform: translateX(-50%) translateY(0px) scale(1);
+    }
+
+    70% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-4px) scale(0.97);
+    }
+}
+
+/* ===== PANEL SLIDE-IN ===== */
+#towerInfoPanel {
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.15s ease;
+}
+
+#towerInfoPanel.panel-hidden {
+    transform: translateX(30px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Tower card — tighter press feel */
+.tower-card:active:not(.disabled) {
+    transform: scale(0.96) translateY(1px) !important;
+    transition: transform 0.06s ease !important;
+}
+
+/* HUD buttons — snappier press */
+.hud-btn:active:not(:disabled) {
+    transform: translateY(2px) scale(0.97) !important;
+    transition: transform 0.06s ease !important;
+}
+
+#towerPanel {
+    width: 240px;
+}
+
+#towerInfoPanel {
+    width: 280px;
+}
+
+#carrierSpawnPanel {
+    right: 300px;
+    width: 240px;
+}
+
+.tower-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+}
+
+/* ===== HUD ANIMATIONS ===== */
+@keyframes hud-pop {
+    0% {
+        transform: scale(1.35);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.hud-pop {
+    animation: hud-pop 0.2s ease-out;
+}
+
+@keyframes hud-dmg {
+    0% {
+        color: #ff2222;
+        transform: scale(1.3);
+        text-shadow: 0 0 16px rgba(255, 30, 30, 0.9);
+    }
+
+    100% {
+        color: #FF6B6B;
+        transform: scale(1);
+    }
+}
+
+.hud-dmg {
+    animation: hud-dmg 0.35s ease-out;
+}
+
+/* ===== WAVE BANNER ===== */
+#waveBanner {
+    position: fixed;
+    top: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.88);
+    border: 2px solid rgba(102, 126, 234, 0.55);
+    border-radius: 14px;
+    padding: 10px 44px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    animation: banner-pop 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(102, 126, 234, 0.2);
+}
+
+.wave-banner-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a8b2d1;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+}
+
+.wave-banner-num {
+    font-size: 46px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 24px rgba(102, 126, 234, 0.9);
+}
+
+@keyframes banner-pop {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.82) translateY(-8px);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translateX(-50%) scale(1.04) translateY(0);
+    }
+
+    22% {
+        transform: translateX(-50%) scale(1);
+    }
+
+    70% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.96) translateY(-4px);
+    }
+}
+
+/* ===== PANEL SLIDE-IN ===== */
+#towerInfoPanel {
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+/* ===== SCREEN SHAKE + HUD POP ANIMATIONS ===== */
+
+@keyframes hud-pop {
+    0% {
+        transform: scale(1.45);
+    }
+
+    60% {
+        transform: scale(0.97);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.hud-pop {
+    animation: hud-pop 0.22s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    display: inline-block;
+}
+
+/* HP flash red when taking damage */
+@keyframes hud-dmg {
+    0% {
+        color: #ff2222;
+        text-shadow: 0 0 18px rgba(255, 34, 34, 0.9);
+        transform: scale(1.3);
+    }
+
+    100% {
+        color: #FF6B6B;
+        text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        transform: scale(1);
+    }
+}
+
+.hud-dmg {
+    animation: hud-dmg 0.35s ease-out;
+}
+
+/* ===== WAVE START BANNER ===== */
+#waveBanner {
+    position: fixed;
+    top: 85px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.88);
+    border: 2px solid rgba(102, 126, 234, 0.55);
+    border-radius: 14px;
+    padding: 10px 48px;
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    pointer-events: none;
+    animation: banner-pop 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(102, 126, 234, 0.2);
+}
+
+.wave-banner-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a8b2d1;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+.wave-banner-num {
+    font-size: 46px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 24px rgba(102, 126, 234, 0.9);
+}
+
+@keyframes banner-pop {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-12px) scale(0.85);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0px) scale(1.04);
+    }
+
+    22% {
+        transform: translateX(-50%) scale(1);
+    }
+
+    70% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px) scale(0.96);
+    }
+}
+
+/* ===== TOWER INFO PANEL SLIDE IN ===== */
+#towerInfoPanel {
+    transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease;
 }

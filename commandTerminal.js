@@ -95,10 +95,12 @@ class CommandTerminal {
             examples: [
                 'Spawn red_cube',
                 'Spawn PARAGON_ALPHA',
-                'Spawn boss_cube'
+                'Spawn boss_cube',
+                'Spawn CBASE_EXECUTIONER'
             ],
             execute: (args) => {
                 const name = args[0];
+                const normalizedName = String(name || '').toLowerCase();
 
                 if (typeof window.spawnEntity !== 'function' || !window.path || window.path.length === 0) {
                     return {
@@ -112,7 +114,10 @@ class CommandTerminal {
                 if (window.ENEMY_TYPES) {
                     if (window.ENEMY_TYPES[name]) enemyKey = name;
                     else {
-                        enemyKey = Object.keys(window.ENEMY_TYPES).find(k => k.toLowerCase() === name.toLowerCase());
+                        enemyKey = Object.keys(window.ENEMY_TYPES).find(k =>
+                            k.toLowerCase() === normalizedName ||
+                            (window.ENEMY_TYPES[k].name && window.ENEMY_TYPES[k].name.toLowerCase() === normalizedName)
+                        );
                     }
                 }
 
@@ -129,16 +134,43 @@ class CommandTerminal {
                 // Case-insensitive lookup for Summon Types
                 let unitKey = null;
                 if (window.SUMMON_TYPES) {
+                    if (normalizedName === 'executioner') {
+                        return {
+                            success: false,
+                            message: '❌ Use CBASE_EXECUTIONER instead of Executioner.'
+                        };
+                    }
+
                     if (window.SUMMON_TYPES[name]) unitKey = name;
                     else {
-                        unitKey = Object.keys(window.SUMMON_TYPES).find(k => k.toLowerCase() === name.toLowerCase());
+                        const summonAliases = {
+                            caster: 'CBASE_CASTER',
+                            oppressor: 'CBASE_OPPRESSOR',
+                            impaler: 'CBASE_IMPALER',
+                            resonator: 'CBASE_RESONATOR',
+                            crusader: 'CBASE_CRUSADER',
+                            crimson: 'CBASE_CRUSADER'
+                        };
+
+                        unitKey = summonAliases[normalizedName] ||
+                            Object.keys(window.SUMMON_TYPES).find(k =>
+                                k.toLowerCase() === normalizedName ||
+                                (window.SUMMON_TYPES[k].name && window.SUMMON_TYPES[k].name.toLowerCase() === normalizedName)
+                            );
                     }
                 }
 
                 if (unitKey) {
                     const unitType = window.SUMMON_TYPES[unitKey];
-                    const startPos = window.path[window.path.length - 1];
-                    window.spawnEntity(unitType, startPos.x, startPos.y, true, true); // isSummon=true, isAlly=true for units
+
+                    if (unitType.isCBaseSummon && typeof window.cbase_spawn_unit === 'function') {
+                        const towerPos = window.path[window.path.length - 1];
+                        window.cbase_spawn_unit(unitType, towerPos.x, towerPos.y);
+                    } else {
+                        const startPos = window.path[window.path.length - 1];
+                        window.spawnEntity(unitType, startPos.x, startPos.y, true, true); // isSummon=true, isAlly=true for units
+                    }
+
                     return {
                         success: true,
                         message: `✅ Spawned unit: ${unitType.name}`
@@ -148,6 +180,33 @@ class CommandTerminal {
                 return {
                     success: false,
                     message: `❌ Error: Unknown enemy or unit: ${name}. Type "Help Spawn" for examples.`
+                };
+            }
+        });
+
+        this.registerCommand('secret_wave', {
+            description: 'Force or disable secret-wave activation after Omega Cube dies in Nightmare mode',
+            parameters: [
+                { name: 'enabled', type: 'boolean', required: true, description: 'true to guarantee activation, false to disable the force toggle' }
+            ],
+            examples: [
+                'secret_wave true',
+                'secret_wave false'
+            ],
+            execute: (args) => {
+                const enabled = !!args[0];
+
+                if (typeof window.setSecretWaveForceEnabled !== 'function') {
+                    return {
+                        success: false,
+                        message: '❌ Secret wave system is not available right now.'
+                    };
+                }
+
+                const result = window.setSecretWaveForceEnabled(enabled);
+                return {
+                    success: !!result?.success,
+                    message: result?.message || 'Secret wave toggle updated.'
                 };
             }
         });
@@ -366,7 +425,10 @@ class CommandTerminal {
         // Filter by input and sort alphabetically
         if (input) {
             return suggestions
-                .filter(s => s.key.toLowerCase().startsWith(input.toLowerCase()))
+                .filter(s =>
+                    s.key.toLowerCase().startsWith(input.toLowerCase()) ||
+                    (s.name && s.name.toLowerCase().startsWith(input.toLowerCase()))
+                )
                 .sort((a, b) => a.key.localeCompare(b.key));
         }
 

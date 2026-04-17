@@ -45,7 +45,7 @@ const CARRIER_UNITS = {
         paybackCooldown: 20000,
         limit: 2,
         hardLimit: 4,
-        delay: 1500
+        delay: 1000
     },
     BLISMA: {
         name: 'Blisma Cube',
@@ -67,7 +67,7 @@ const CARRIER_UNITS = {
     REFRACTOR: {
         name: 'Refractor Cube',
         color: '#00CED1',
-        damage: 10,
+        damage: 30,
         damageInc: 10,
         fireRate: 60,
         duration: 20000,
@@ -168,6 +168,8 @@ function updateCarrierUnits() {
         if (unit.type === CARRIER_UNITS.BOMBER) {
             if (!unit.hasImpacted && currentTime >= unit.impactTime) {
                 unit.hasImpacted = true;
+                if (window.triggerShake) window.triggerShake(15, 650);
+                if (window.sfxOrbitalImpact) window.sfxOrbitalImpact();
 
                 const level = unit.owner.level;
                 const damage = level === 1 ? unit.type.damage : unit.type.damageL2;

@@ -89,22 +89,22 @@ const TOWER_TYPES = {
             { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }], upgradeCost: 1000 },
             { summons: [{ type: 'RED', spawnRate: 10000 }, { type: 'YELLOW', spawnRate: 6000 }, { type: 'GRAY', spawnRate: 15000 }], upgradeCost: 2500 },
             { summons: [{ type: 'RED_L4', spawnRate: 9000 }, { type: 'YELLOW_L4', spawnRate: 9000 }, { type: 'GRAY_L4', spawnRate: 9000 }, { type: 'DARK_RED', spawnRate: 18000 }], upgradeCost: 6250 },
-            { summons: [{ type: 'DARK_RED_L5', spawnRate: 12000 }, { type: 'CYAN', spawnRate: 20000 }], upgradeCost: 15000 }
+            { summons: [{ type: 'DARK_RED_L5', spawnRate: 20000 }, { type: 'CYAN', spawnRate: 40000 }], upgradeCost: 15000 }
         ]
     },
 
     FARM: {
         name: 'Farm',
         color: '#006400',
-        cost: 200,
+        cost: 500,
         aoe: false,
         summons: false,
         farm: true,
         levels: [
             { cashPerWave: 100, upgradeCost: 0 },
-            { cashPerWave: 200, upgradeCost: 300 },
-            { cashPerWave: 500, upgradeCost: 800 },
-            { cashPerWave: 1500, upgradeCost: 2000 }
+            { cashPerWave: 200, upgradeCost: 1000 },
+            { cashPerWave: 500, upgradeCost: 2000 },
+            { cashPerWave: 2000, upgradeCost: 5000 }
         ]
     },
 
@@ -131,13 +131,13 @@ const TOWER_TYPES = {
         summons: true,
         size: 2,
         limit: 1,
-        abilityCooldown: 80000,
+        abilityCooldown: 120000,
         levels: [
-            { summons: [{ type: 'BLUE_SQUARE', spawnRate: 12000 }], upgradeCost: 0 },
-            { summons: [{ type: 'BLUE_SQUARE_L2', spawnRate: 10000 }, { type: 'PINK_SQUARE', spawnRate: 10000 }], upgradeCost: 5000 },
-            { summons: [{ type: 'BLUE_SQUARE_L3', spawnRate: 10000 }, { type: 'PINK_SQUARE_L3', spawnRate: 10000 }, { type: 'ORANGE_SQUARE', spawnRate: 10000 }], upgradeCost: 5000 },
-            { summons: [{ type: 'BLUE_SQUARE_L4', spawnRate: 10000 }, { type: 'PINK_SQUARE_L4', spawnRate: 10000 }, { type: 'ORANGE_SQUARE_L4', spawnRate: 10000 }, { type: 'DARK_BLUE_SQUARE', spawnRate: 15000 }], upgradeCost: 20000 },
-            { summons: [{ type: 'GREEN_SQUARE', spawnRate: 6000 }, { type: 'PINK_SQUARE_L5', spawnRate: 6000 }, { type: 'DARK_BLUE_SQUARE_L5', spawnRate: 7500 }], upgradeCost: 75000 }
+            { summons: [{ type: 'BLUE_SQUARE', spawnRate: 10000 }], upgradeCost: 0 },
+            { summons: [{ type: 'BLUE_SQUARE_L2', spawnRate: 12000 }, { type: 'PINK_SQUARE', spawnRate: 12000 }], upgradeCost: 5000 },
+            { summons: [{ type: 'BLUE_SQUARE_L3', spawnRate: 12000 }, { type: 'PINK_SQUARE_L3', spawnRate: 12000 }, { type: 'ORANGE_SQUARE', spawnRate: 12000 }], upgradeCost: 20000 },
+            { summons: [{ type: 'BLUE_SQUARE_L4', spawnRate: 15000 }, { type: 'PINK_SQUARE_L4', spawnRate: 15000 }, { type: 'ORANGE_SQUARE_L4', spawnRate: 15000 }, { type: 'DARK_BLUE_SQUARE', spawnRate: 15000 }], upgradeCost: 40000 },
+            { summons: [{ type: 'GREEN_SQUARE', spawnRate: 20000 }, { type: 'PINK_SQUARE_L5', spawnRate: 20000 }, { type: 'DARK_BLUE_SQUARE_L5', spawnRate: 20000 }], upgradeCost: 100000 }
         ]
     },
 
@@ -158,6 +158,118 @@ const TOWER_TYPES = {
         ]
     },
 
+    AGENT: {
+        name: 'Agent',
+        color: '#2F4F4F',
+        cost: 500,
+        aoe: false,
+        summons: false,
+        isAgent: true,
+        levels: [
+            {
+                upgradeCost: 0,
+                abilities: {
+                    stun: { duration: 1000, cooldown: 10000, targeted: true },
+                    slowdown: { amount: 0.10, duration: 3000, cooldown: 10000, targeted: true }
+                }
+            },
+            {
+                upgradeCost: 2000,
+                abilities: {
+                    stun: { duration: 2000, cooldown: 10000, targeted: true },
+                    slowdown: { amount: 0.15, duration: 4000, cooldown: 10000, targeted: true },
+                    index: { cashBonus: 50, damageVulnerability: 0.05, cooldown: 20000, potencyGain: 0, targeted: true }
+                }
+            },
+            {
+                upgradeCost: 4000,
+                potencyCap: 10,
+                abilities: {
+                    stun: { duration: 3000, cooldown: 10000, targeted: true },
+                    slowdown: { amount: 0.20, duration: 5000, cooldown: 10000, targeted: true },
+                    index: { cashBonus: 150, damageVulnerability: 0.10, cooldown: 15000, potencyGain: 1, targeted: true },
+                    hijack: { duration: 5000, cooldown: 30000, mode: 'necromancer' },
+                    sweeper: { durationWaves: 2, hpPercent: 0.05, affectsHpBarOnlyFalse: true, affectsShield: false, potencyCost: 5, cooldown: 80000 }
+                }
+            },
+            {
+                upgradeCost: 12000,
+                potencyCap: 10,
+                abilities: {
+                    stun: { duration: 5000, cooldown: 10000, targeted: true },
+                    slowdown: { amount: 0.25, duration: 6000, cooldown: 10000, targeted: true },
+                    index: { cashBonus: 250, damageVulnerability: 0.15, cooldown: 15000, potencyGain: 2, targeted: true },
+                    hijack: { duration: 5000, cooldown: 30000, mode: 'all' },
+                    sweeper: { durationWaves: 3, hpPercent: 0.10, affectsHpBarOnlyFalse: true, affectsShield: true, potencyCost: 8, cooldown: 60000 },
+                    shieldBreaker: { shieldDamage: 250000, potencyCost: 4, cooldown: 30000 },
+                    paralyzer: { stunDuration: 1000, slowAmount: 0.70, slowDuration: 2000, resistanceDebuff: 0.10, duration: 2000, potencyCost: 6, cooldown: 45000, targeted: true }
+                }
+            }
+        ]
+    },
+
+    COMMANDO: {
+        name: 'Commando',
+        color: '#6B8E23',
+        cost: 2500,
+        limit: 6,
+        damageType: 'bullet',
+        aoe: false,
+        summons: false,
+        isCommando: true,
+        levels: [
+            { damage: 20, fireRate: 1000, range: 4, upgradeCost: 0 },
+            { damage: 25, fireRate: 800, range: 5, rocketDamage: 50, rocketFireRate: 2000, rocketAOE: 1, upgradeCost: 700 },
+            { damage: 40, fireRate: 650, range: 5, rocketDamage: 75, rocketFireRate: 2000, rocketAOE: 1, upgradeCost: 1600 },
+            { damage: 50, fireRate: 500, range: 7, rocketDamage: 125, rocketFireRate: 2000, rocketAOE: 2, upgradeCost: 3000 },
+            {
+                damage: 250,
+                fireRate: 400,
+                range: 8,
+                primaryDamageType: 'piercing',
+                rocketDamage: 300,
+                rocketFireRate: 2000,
+                rocketAOE: 2,
+                taserDamage: 1000,
+                taserFireRate: 30000,
+                taserStun: 2500,
+                taserSlow: 0.25,
+                taserSlowDuration: 4000,
+                goldenDuration: 15000,
+                goldenActivationCost: 1000,
+                goldenDamageMultiplier: 2,
+                goldenPrimaryFireRate: 250,
+                goldenRocketFireRate: 1000,
+                goldenTaserFireRate: 25000,
+                goldenCashDrainDuration: 10000,
+                goldenShotCost: 25,
+                goldenRocketShotCost: 50,
+                goldenTaserShotCost: 200,
+                abilityCooldown: 60000,
+                upgradeCost: 6000
+            }
+        ]
+    },
+
+    LUNAR_CUBE: {
+        name: 'Lunar Cube',
+        color: '#B0C4DE',
+        cost: 10000,
+        limit: 4,
+        damageType: 'bullet',
+        aoe: false,
+        summons: false,
+        isLunarCube: true,
+        cannotBeBuffed: true,
+        levels: [
+            { damage: 20, fireRate: 200, range: 7, laserDamage: 200, laserFireRate: 4000, upgradeCost: 0 },
+            { damage: 25, fireRate: 100, range: 8, laserDamage: 500, laserFireRate: 4000, upgradeCost: 5000 },
+            { damage: 40, fireRate: 100, range: 10, laserDamage: 750, laserFireRate: 3000, explosiveDamage: 100, explosiveCount: 10, explosiveBurstRate: 75, explosiveFireRate: 12000, explosiveAOE: 1, upgradeCost: 15000 },
+            { damage: 75, fireRate: 100, range: 12, laserDamage: 1500, laserFireRate: 3000, explosiveDamage: 200, explosiveCount: 10, explosiveBurstRate: 65, explosiveFireRate: 12000, explosiveAOE: 1, adaptiveMainGun: true, adaptiveResistanceThreshold: 0.3, upgradeCost: 40000 },
+            { damage: 100, fireRate: 50, range: 14, laserDamage: 4000, laserFireRate: 4000, explosiveDamage: 250, explosiveCount: 20, explosiveBurstRate: 65, explosiveFireRate: 10000, explosiveAOE: 1, globalExplosionDamage: 5000, globalExplosionAOE: 4, globalExplosionFireRate: 20000, omegaDamage: 20000, omegaChargeTime: 2000, omegaFireRate: 40000, omegaLaserRequirement: 5, adaptiveMainGun: true, adaptiveResistanceThreshold: 0.3, upgradeCost: 100000 }
+        ]
+    },
+
     EXECUTIVE: {
         name: 'Executive',
         color: '#DC143C',
@@ -174,8 +286,8 @@ const TOWER_TYPES = {
             { damage: 20, fireRate: 2000, range: 2, upgradeCost: 0 },
             { damage: 30, fireRate: 1000, range: 3, upgradeCost: 800 },
             { damage: 50, fireRate: 500, range: 4, upgradeCost: 3000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 12000, count: 2 }] },
-            { damage: 45, fireRate: 100, range: 5, upgradeCost: 12000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 15000, count: 2 }, { type: 'EXEC_TANK', spawnRate: 30000, count: 1 }] },
-            { damage: 85, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true, summons: [{ type: 'ELITE_OPERATOR_L5', spawnRate: 20000, count: 3 }, { type: 'EXEC_TANK', spawnRate: 35000, count: 1 }, { type: 'EXEC_ARTILLERY', spawnRate: 50000, count: 1 }] }
+            { damage: 45, fireRate: 100, range: 5, upgradeCost: 12000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 20000, count: 2 }, { type: 'EXEC_TANK', spawnRate: 50000, count: 1 }] },
+            { damage: 85, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true, summons: [{ type: 'ELITE_OPERATOR_L5', spawnRate: 30000, count: 3 }, { type: 'EXEC_TANK', spawnRate: 60000, count: 1 }, { type: 'EXEC_ARTILLERY', spawnRate: 80000, count: 1 }] }
         ]
     },
 
@@ -183,19 +295,19 @@ const TOWER_TYPES = {
     CHARGER: {
         name: 'Charger',
         color: 'cyan',
-        cost: 7250,
+        cost: 20000,
         damageType: 'laser',
         aoe: false,
         summons: false,
         limit: 8,
         isCharger: true,
-        targetCooldown: 3000,
+        targetCooldown: 3500,
         levels: [
-            { damageMin: 10, damageMax: 20, fireRate: 250, range: 6, upgradeCost: 0 },
-            { damageMin: 25, damageMax: 35, fireRate: 200, range: 7, upgradeCost: 5000 },
-            { damageMin: 40, damageMax: 80, fireRate: 150, range: 8, upgradeCost: 15000 },
-            { damageMin: 50, damageMax: 100, chargeMaxMin: 200, chargeMaxMax: 250, chargeRate: 2, chargeInterval: 100, fireRate: 100, range: 8, upgradeCost: 30000, cannotBeBuffed: true },
-            { damageMin: 80, damageMax: 120, chargeMaxMin: 250, chargeMaxMax: 500, chargeRate: 5, chargeInterval: 100, fireRate: 100, range: 10, upgradeCost: 50000, cannotBeBuffed: true }
+            { damageMin: 10, damageMax: 20, fireRate: 200, range: 6, upgradeCost: 0 },
+            { damageMin: 25, damageMax: 35, fireRate: 150, range: 7, upgradeCost: 5000 },
+            { damageMin: 70, damageMax: 100, fireRate: 100, range: 8, upgradeCost: 15000 },
+            { damageMin: 75, damageMax: 100, chargeMaxMin: 250, chargeMaxMax: 300, chargeRate: 2, chargeInterval: 200, fireRate: 100, range: 8, upgradeCost: 30000, cannotBeBuffed: true },
+            { damageMin: 100, damageMax: 200, chargeMaxMin: 450, chargeMaxMax: 500, chargeRate: 5, chargeInterval: 250, fireRate: 100, range: 12, upgradeCost: 100000, cannotBeBuffed: true }
         ]
     },
 
@@ -230,11 +342,11 @@ const TOWER_TYPES = {
         cannotBeBuffed: true,
         rangeBonus: 2,
         hasAlpha: true,
-        alphaCost: 7500,
+        alphaCost: 50000,
         alphaCooldown: 60000,
         hasBeta: true,
-        betaCost: 20000,
-        betaCooldown: 90000,
+        betaCost: 10000,
+        betaCooldown: 180000,
         levels: [
             {
                 damage: 75,
@@ -252,7 +364,7 @@ const TOWER_TYPES = {
                 radian: 2,
                 baseHp: 500,
                 hasAlpha: true,
-                alphaMultiplier: 10,
+                alphaMultiplier: 35,
                 upgradeCost: 0
             },
             {
@@ -262,7 +374,7 @@ const TOWER_TYPES = {
                 radian: 3,
                 baseHp: 1000,
                 hasAlpha: true,
-                alphaMultiplier: 50,
+                alphaMultiplier: 100,
                 hasBeta: true,
                 upgradeCost: 0
             }
@@ -308,6 +420,41 @@ const TOWER_TYPES = {
                 upgradeCost: 0
             }
         ]
+    },
+
+    DRONE: typeof DRONE_TOWER_TYPE !== 'undefined' ? DRONE_TOWER_TYPE : {
+        name: 'Drone',
+        color: '#00FA9A',
+        cost: 5000,
+        aoe: false,
+        summons: false,
+        size: 1.5,
+        limit: 1,
+        levels: []
+    },
+
+    MAFIA: typeof MAFIA_TOWER_TYPE !== 'undefined' ? MAFIA_TOWER_TYPE : {
+        name: 'Mafia',
+        color: '#1A1A1A',
+        cost: 500,
+        aoe: false,
+        summons: true,
+        isHybrid: true,
+        isMafia: true,
+        limit: 2,
+        levels: []
+    },
+
+    CBASE: typeof CBASE_TOWER_TYPE !== 'undefined' ? CBASE_TOWER_TYPE : {
+        name: 'C-Base',
+        color: '#8B0000',
+        cost: 100000,
+        aoe: false,
+        summons: true,
+        isCBase: true,
+        size: 5,
+        limit: 1,
+        levels: []
     }
 };
 
@@ -518,13 +665,13 @@ const SUMMON_TYPES = {
         speed: 0.4,
         size: 27,
         isSummon: true,
-        damage: 2000,
+        damage: 1000,
         fireRate: 1000,
         range: 14
     },
     PINK_SQUARE_L5: {
         name: 'Pink Square L5',
-        color: 'darkpink',
+        color: 'pink',
         hp: 2000,
         speed: 0.5,
         size: 27,
@@ -543,37 +690,6 @@ const SUMMON_TYPES = {
         size: 35,
         isSummon: true,
         selfDestructDamage: 5000
-    },
-
-    // Rainbow Cube (Elite Spawner ability)
-    RAINBOW_CUBE: {
-        name: 'Rainbow Cube',
-        color: 'rainbow',
-        hp: 100000,
-        speed: 0.25,
-        size: 50,
-        isSummon: true,
-        railgunDamage: 5000,
-        railgunFireRate: 500,
-        railgunCount: 2,
-        railgunCooldown: 3000,
-        missileDamage: 1500,
-        missileDirectDamage: 2500,
-        missileFireRate: 400,
-        missileCount: 3,
-        missileCooldown: 4000,
-        laserDamage: 250,
-        laserBurstCount: 25,
-        laserFireRate: 40,
-        laserCooldown: 2500,
-        minigunDamage: 150,
-        minigunFireRate: 50,
-        mainRailgunDamage: 50000,
-        mainRailgunCount: 4,
-        mainRailgunFireRate: 250,
-        mainRailgunCooldown: 15000,
-        mainRailgunUses: 2,
-        range: 22
     },
 
     // Paragon Beta summons (alternative)
@@ -625,32 +741,32 @@ const SUMMON_TYPES = {
     FACTORY_CUBE_L1: {
         name: 'Factory Cube L1',
         color: '#8B0000',
-        hp: 15000,
+        hp: 40000,
         speed: 0.25,
         size: 35,
         isSummon: true,
-        range: 12,
-        minigunDamage: 200,
+        range: 16,
+        minigunDamage: 250,
         minigunFireRate: 100,
-        rocketDamage: 400,
-        rocketDirectDamage: 600,
+        rocketDamage: 500,
+        rocketDirectDamage: 1000,
         rocketFireRate: 250,
         rocketCount: 4,
-        rocketCooldown: 3500,
+        rocketCooldown: 3000,
         rocketAOERange: 2
     },
     FACTORY_CUBE_L2: {
         name: 'Factory Cube L2',
         color: '#CD5C5C',
-        hp: 54000,
-        speed: 0.175,
+        hp: 85000,
+        speed: 0.22,
         size: 40,
         isSummon: true,
         range: 12,
-        minigunDamage: 250,
-        minigunFireRate: 80,
-        rocketDamage: 600,
-        rocketDirectDamage: 1000,
+        minigunDamage: 500,
+        minigunFireRate: 100,
+        rocketDamage: 1000,
+        rocketDirectDamage: 2000,
         rocketFireRate: 200,
         rocketCount: 4,
         rocketCooldown: 4000,
@@ -658,10 +774,10 @@ const SUMMON_TYPES = {
         railgunDamage: 10000,
         railgunCooldown: 7000,
         railgunRange: 100,
-        knockbackCooldown: 5000,
+        knockbackCooldown: 6000,
         knockbackExplosionRange: 3,
-        knockbackExplosionDamage: 2000,
-        knockbackDirectDamage: 5000,
+        knockbackExplosionDamage: 4000,
+        knockbackDirectDamage: 6000,
         knockbackPower: 3,
         isBossKnockbacker: true
     },
@@ -669,34 +785,26 @@ const SUMMON_TYPES = {
         name: 'Factory Cube L3',
         color: '#FFD700',
         hp: 250000,
-        speed: 0.12,
+        speed: 0.2,
         size: 54,
         isSummon: true,
         range: 14,
-        minigunDamage: 500,
+        minigunDamage: 1000,
         minigunFireRate: 80,
         rocketDamage: 2500,
-        rocketDirectDamage: 3500,
+        rocketDirectDamage: 6000,
         rocketFireRate: 200,
-        rocketCount: 6,
-        rocketCooldown: 5000,
+        rocketCount: 5,
+        rocketCooldown: 6000,
         rocketAOERange: 5,
         railgunDamage: 25000,
-        railgunCooldown: 6000,
+        railgunCooldown: 4000,
         railgunRange: Infinity,
+        isBossKnockbacker: true,
         knockbackCooldown: 6000,
-        name: 'Orange Square L4',
-        color: 'orange',
-        hp: 1000,
-        speed: 0.5,
-        size: 25,
-        isSummon: true,
-        damage: 300,
-        directDamage: 750,
-        fireRate: 1500,
-        range: 8,
-        aoe: true
+        knockbackPower: 5
     },
+
     DARK_BLUE_SQUARE: {
         name: 'Dark Blue Square',
         color: 'darkblue',
@@ -719,7 +827,7 @@ const SUMMON_TYPES = {
     },
     PINK_SQUARE_L5: {
         name: 'Pink Square L5',
-        color: 'darkpink',
+        color: 'pink',
         hp: 2000,
         speed: 0.5,
         size: 27,
@@ -752,18 +860,18 @@ const SUMMON_TYPES = {
         railgunFireRate: 500,
         railgunCount: 2,
         railgunCooldown: 3000,
-        missileDamage: 1500,
-        missileDirectDamage: 2500,
-        missileFireRate: 400,
+        missileDamage: 1000,
+        missileDirectDamage: 2000,
+        missileFireRate: 200,
         missileCount: 3,
         missileCooldown: 4000,
         laserDamage: 250,
-        laserBurstCount: 25,
-        laserFireRate: 40,
-        laserCooldown: 2500,
-        minigunDamage: 150,
+        laserBurstCount: 20,
+        laserFireRate: 50,
+        laserCooldown: 3000,
+        minigunDamage: 125,
         minigunFireRate: 50,
-        mainRailgunDamage: 50000,
+        mainRailgunDamage: 25000,
         mainRailgunCount: 4,
         mainRailgunFireRate: 250,
         mainRailgunCooldown: 15000,
@@ -935,8 +1043,24 @@ const SUMMON_TYPES = {
         range: Infinity,
         aoe: true,
         aoeRange: 2
-    }
+    },
+
+    // Mafia tower summons
+    MAFIA_GUNNER_L1: typeof MAFIA_GUNNER_L1 !== 'undefined' ? MAFIA_GUNNER_L1 : { name: 'Mafia Gunner L1', color: '#333333', hp: 50, speed: 0.25, size: 18, isSummon: true, damage: 10, fireRate: 500, range: 5, isMafiaGunner: true, stopsToShoot: true },
+    MAFIA_GUNNER_L2: typeof MAFIA_GUNNER_L2 !== 'undefined' ? MAFIA_GUNNER_L2 : { name: 'Mafia Gunner L2', color: '#222222', hp: 500, speed: 0.25, size: 22, isSummon: true, damage: 50, fireRate: 600, range: 6, isMafiaGunner: true, stopsToShoot: true },
+    MAFIA_GOLDEN_GUNNER: typeof MAFIA_GOLDEN_GUNNER !== 'undefined' ? MAFIA_GOLDEN_GUNNER : { name: 'Golden Gunner', color: '#FFD700', hp: 10000, speed: 0.25, size: 28, isSummon: true, damage: 1000, fireRate: 500, range: 8, isMafiaGunner: true, stopsToShoot: true },
+
+    // C-Base tower summons (registered by CBase.js cbase_register_summon_types)
+    CBASE_CASTER:      typeof CBASE_CASTER      !== 'undefined' ? CBASE_CASTER      : { name: 'Caster',      color: '#FF0000', hp: 500,    speed: 0.35, size: 18, isSummon: true, isCBaseSummon: true },
+    CBASE_OPPRESSOR:   typeof CBASE_OPPRESSOR   !== 'undefined' ? CBASE_OPPRESSOR   : { name: 'Oppressor',   color: '#FF0000', hp: 3000,   speed: 0.3,  size: 24, isSummon: true, isCBaseSummon: true },
+    CBASE_IMPALER:     typeof CBASE_IMPALER     !== 'undefined' ? CBASE_IMPALER     : { name: 'Impaler',     color: '#FF0000', hp: 6000,   speed: 0.25, size: 28, isSummon: true, isCBaseSummon: true },
+    CBASE_RESONATOR:   typeof CBASE_RESONATOR   !== 'undefined' ? CBASE_RESONATOR   : { name: 'Resonator',   color: '#F06292', hp: 5000,   speed: 0.35, size: 35, isSummon: true, isCBaseSummon: true },
+    CBASE_EXECUTIONER: typeof CBASE_EXECUTIONER !== 'undefined' ? CBASE_EXECUTIONER : { name: 'Executioner', color: '#6B0000', hp: 50000,  speed: 0.15, size: 40, isSummon: true, isCBaseSummon: true },
+    CBASE_CRUSADER:    typeof CBASE_CRUSADER    !== 'undefined' ? CBASE_CRUSADER    : { name: 'Crimson Crusader', color: '#A00000', hp: 200000, speed: 0.12, size: 54, isSummon: true, isCBaseSummon: true }
 };
 
 // Expose to window for command terminal
 window.SUMMON_TYPES = SUMMON_TYPES;
+
+// Register C-Base summon types into the SUMMON_TYPES table (overwrites placeholders with full defs)
+if (typeof cbase_register_summon_types === 'function') cbase_register_summon_types();

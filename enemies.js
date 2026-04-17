@@ -88,35 +88,42 @@ const ENEMY_TYPES = {
     true_void: { name: 'True Void', baseHp: 3000000, shieldHp: 2000000, speed: 0.15, color: '#000000', size: 65, hasShield: true, isBoss: false, showHpBar: true, resistances: { global: 0.10, bullet: 0.10, laser: 0.10, piercing: 0.10, explosive: 0.10 } },
 
     // ===== NIGHTMARE MODE ENEMIES =====
-    yellow_cube_nm: { name: 'Yellow Cube', baseHp: 50, speed: 0.4, color: '#d8f500ff', size: 22, resistances: { explosive: 0.65 } },
-    purple_cube_nm: { name: 'Purple Cube', baseHp: 75, speed: 0.4, color: '#9618e4ff', size: 20, resistances: { explosive: 0.65 } },
-    green_cube_nm: { name: 'Green Cube', baseHp: 200, speed: 0.3, color: '#22b32fff', size: 22, resistances: { explosive: 0.5 } },
-    golden_cube_nm: { name: 'Golden Cube', baseHp: 3000, speed: 0.275, color: '#FFD700', size: 30, resistances: { explosive: 0.7 } },
+    yellow_cube_nm: { name: 'Yellow Cube', baseHp: 125, speed: 0.4, color: '#d8f500ff', size: 22, resistances: { explosive: 0.65 } },
+    purple_cube_nm: { name: 'Purple Cube', baseHp: 50, speed: 0.46, color: '#9618e4ff', size: 20, resistances: { explosive: 0.65 } },
+    green_cube_nm: { name: 'Green Cube', baseHp: 500, speed: 0.3, color: '#22b32fff', size: 22, resistances: { explosive: 0.5 } },
+    golden_cube_nm: { name: 'Golden Cube', baseHp: 10000, speed: 0.25, color: '#FFD700', size: 30, resistances: { explosive: 0.7, laser: 0.20, bullet: 0.3 } },
     // before w20
-    berserker_cube_nm: { name: 'Berserker Cube', baseHp: 20000, shieldHp: 5000, speed: 0.25, color: '#FFD700', size: 35, hasShield: true, isBoss: true, showHpBar: true, resistances: { global: 0, bullet: 0.10, laser: 0.10, piercing: -0.10, explosive: 0.60 } },
+    berserker_cube_nm: { name: 'Berserker Cube', baseHp: 40000, shieldHp: 60000, speed: 0.275, color: '#FFD700', size: 35, hasShield: true, isBoss: true, showHpBar: true, resistances: { global: 0.05, bullet: 0.10, laser: 0.10, piercing: -0.10, explosive: 0.60, summonerRange: 0.3, summonerCollision: 0.3 } },
     // after w20
-    frozen_cube_nm: { name: 'Frozen Cube', baseHp: 500, speed: 0.35, color: '#87CEEB', size: 25, resistances: { global: 0, bullet: 0.20, laser: 0.20, piercing: -0.35, explosive: 1 } },
-    lava_cube_nm: { name: 'Lava Cube', baseHp: 500, speed: 0.35, color: '#FF6347', size: 25, resistances: { global: 0, bullet: 0, laser: 0, piercing: 0, explosive: 1 } },
+    frozen_cube_nm: { name: 'Frozen Cube', baseHp: 750, speed: 0.35, color: '#87CEEB', size: 25, resistances: { global: 0.1, bullet: 0.40, laser: 0.60, piercing: -0.35, explosive: 1 } },
+    lava_cube_nm: { name: 'Lava Cube', baseHp: 750, speed: 0.35, color: '#FF6347', size: 25, resistances: { global: 0.2, bullet: 0, laser: 0, piercing: 0.6, explosive: 1 } },
     // after w25
-    necromancer_nm: { name: 'Necromancer', baseHp: 10000, speed: 0.2, color: '#4A3A5C', size: 30, isSummoner: true, summonType: 'nmsummon_nm', summoncooldown: 12000, summoncount: 2 },
-    nmsummon_nm: { name: 'Summoned Cube', baseHp: 1000, speed: 0.25, color: '#6B5B7A', size: 20, isSummoned: true, },
-    unstable_crystal_nm: { name: 'Unstable Crystal', baseHp: 5000, speed: 0.325, color: '#1f7eb1c2', size: 22, resistances: { global: 0.20, bullet: 0.50, laser: 0.50, piercing: -0.40, explosive: 0.50 } },
+    necromancer_nm: { name: 'Necromancer', baseHp: 15000, speed: 0.2, color: '#4A3A5C', size: 30, isSummoner: true, summonType: 'nmsummon_nm', summoncooldown: 5000, summoncount: 3 },
+    nmsummon_nm: { name: 'Summoned Cube', baseHp: 2000, speed: 0.25, color: '#6B5B7A', size: 20, isSummoned: true, resistances: { global: 0.3, bullet: 0.10, laser: 0.10, piercing: -0.2 } },
+    unstable_crystal_nm: { name: 'Unstable Crystal', baseHp: 7000, speed: 0.325, color: '#1f7eb1c2', size: 22, resistances: { global: 0.20, bullet: 0.50, laser: 0.50, piercing: -0.40, explosive: 0.50 } },
     // after w30
     shielder_cube_nm: { name: 'Shielder Cube', baseHp: 7500, shieldHp: 2500, speed: 0.35, color: '#4dd2ff', size: 24, isSupport: true },
-    obsidian_cube_nm: { name: 'Obsidian Cube', baseHp: 20000, speed: 0.3, color: '#1a1a1a', size: 26, resistances: { global: 0.10, bullet: 0.80, laser: 0.50, piercing: -0.20, explosive: 0.90 } },
-    silver_cube_nm: { name: 'Silver Cube', baseHp: 15000, speed: 0.4, color: '#C0C0C0', size: 25, isQuantum: true, phaseTwoHp: 5000, phaseTwoBonusHp: 10000, phaseTwoSpeedMultiplier: 2, showHpBar: false, resistances: { global: 0.10, bullet: 0.30, laser: 1, piercing: -0.70, explosive: 0.10 } },
+    obsidian_cube_nm: { name: 'Obsidian Cube', baseHp: 20000, speed: 0.3, color: '#1a1a1a', size: 26, resistances: { global: 0.10, bullet: 0.80, laser: 0.50, piercing: -0.20, explosive: 0.90, summonerRange: 0.4, summonerCollision: 0.6 } },
+    silver_cube_nm: { name: 'Silver Cube', baseHp: 15000, speed: 0.4, color: '#C0C0C0', size: 25, isQuantum: true, phaseTwoHp: 5000, phaseTwoBonusHp: 10000, phaseTwoSpeedMultiplier: 2, showHpBar: false, resistances: { global: 0.10, bullet: 0.30, laser: 1, piercing: -0.70, explosive: 0.80, summonerRange: 0.3, summonerCollision: 1 } },
+    gargantuar_king_nm: { name: 'Gargantuar King', baseHp: 250000, shieldHp: 250000, speed: 0.24, color: '#800000', size: 35, hasShield: true, isBoss: true, isKing: true, showHpBar: true, resistances: { global: 0.10, bullet: 0.50, laser: -0.20, piercing: 0.35, explosive: 0.95, summonerRange: 0.1, summonerCollision: 0.5 } },
     // after w35
-    ram_cube_nm: { name: 'Ram Cube-X', baseHp: 80000, shieldHp: 60000, speed: 0.26, color: '#CD5C5C', size: 42, hasShield: true, isBoss: true, insaneHp: 60000, insaneShield: 60000, insaneSpeed: 0.2, resistances: { global: 0.20, bullet: 0.70, laser: 0.70, piercing: -0.50, explosive: 0.40 } },
+    ram_cube_nm: { name: 'Ram Cube-X', baseHp: 100000, shieldHp: 50000, speed: 0.26, color: '#CD5C5C', size: 42, hasShield: true, isBoss: true, insaneHp: 60000, insaneShield: 60000, insaneSpeed: 0.2, resistances: { global: 0.20, bullet: 0.70, laser: 0.70, piercing: -0.50, explosive: 0.40, summonerRange: 0.6, summonerCollision: 0.6 } },
     // before w40
-    celgar_cube_nm: { name: 'General Celgar', baseHp: 1200000, shieldHp: 800000, speed: 0.15, color: '#1f61e4ff', size: 60, hasShield: true, isBoss: false, showHpBar: true, resistances: { global: 0, bullet: 0.20, laser: 0.20, piercing: 0.20, explosive: 1 } },
+    celgar_cube_nm: { name: 'General Celgar', baseHp: 1500000, shieldHp: 1000000, speed: 0.2, color: '#1f61e4ff', size: 60, hasShield: true, isBoss: false, showHpBar: true, resistances: { global: 0.1, bullet: 0.20, laser: 0.20, piercing: 0.20, explosive: 1, summonerRange: 0.2, summonerCollision: 0.2 } },
     // after w40
-    emperor_cube_nm: { name: 'Emperor Cube', baseHp: 200000, shieldHp: 100000, speed: 0.275, color: '#ffffffff', size: 50, hasShield: true, isBoss: true, resistances: { global: 0.10, bullet: -0.20, laser: 0.80, piercing: -0.20, explosive: 0.3 } },
-    golden_titan_nm: { name: 'Golden Titan', baseHp: 150000, shieldHp: 350000, speed: 0.25, color: '#FFD700', size: 50, hasShield: true, isBoss: true, resistances: { global: 0.10, bullet: 0.80, laser: -0.20, piercing: -0.20, explosive: 0.3 } },
-    elite_necromancer_nm: { name: 'Elite Necromancer', baseHp: 100000, shieldHp: 100000, speed: 0.15, color: '#2D1B3D', size: 40, isSummoner: true, summonType: 'nmsummon2_nm', summoncooldown: 8000, summoncount: 3, hasShield: true, resistances: { global: 0.15, bullet: 0.25, laser: 0.10, piercing: -0.30, explosive: 0.40 } },
-    nmsummon2_nm: { name: 'Elite Summoned Cube', baseHp: 8000, speed: 0.4, color: '#4A3A5C', size: 20, isSummoned: true, resistances: { global: 0, bullet: 0.40, laser: 0.20, piercing: 0, explosive: 1 } },
+    emperor_cube_nm: { name: 'Emperor Cube', baseHp: 200000, shieldHp: 100000, speed: 0.275, color: '#ffffffff', size: 50, hasShield: true, isBoss: true, resistances: { global: 0.10, bullet: -0.20, laser: 0.80, piercing: -0.20, explosive: 0.3, summonerRange: 0.2, summonerCollision: 0.2 } },
+    golden_titan_nm: { name: 'Golden Titan', baseHp: 150000, shieldHp: 350000, speed: 0.25, color: '#FFD700', size: 50, hasShield: true, isBoss: true, resistances: { global: 0.10, bullet: 0.80, laser: -0.20, piercing: -0.20, explosive: 0.3, summonerRange: 0.2, summonerCollision: 0.2 } },
+    elite_necromancer_nm: { name: 'Elite Necromancer', baseHp: 100000, shieldHp: 100000, speed: 0.20, color: '#2D1B3D', size: 40, isSummoner: true, summonType: 'nmsummon2_nm', summoncooldown: 10000, summoncount: 3, hasShield: true, resistances: { global: 0.15, bullet: 0.25, laser: 0.10, piercing: -0.30, explosive: 0.40 } },
+    nmsummon2_nm: { name: 'Elite Summoned Cube', baseHp: 20000, speed: 0.4, color: '#4A3A5C', size: 20, isSummoned: true, resistances: { global: 0.4, bullet: 0.40, laser: 0.20, piercing: 0, explosive: 1, summonerRange: 0.1, summonerCollision: 0.6 } },
     // w50 
-    omega_cube_nm: { name: 'THE OMEGA CUBE', baseHp: 20000000, shieldHp: 5000000, speed: 0.125, color: '#ffffffff', size: 80, hasShield: true, isBoss: false, showHpBar: true, loopcount: 2, insaneLoopcount: 3, isSummoner: true, resistances: { global: 0.10, bullet: 0.20, laser: 0.20, piercing: 0.1, explosive: 0.30 } },
-    omegasummon_nm: { name: 'Omega Summon', baseHp: 500000, speed: 0.35, color: '#ffffffff', size: 25, isSummoned: true, summonType: 'omegasummon_nm', resistances: { global: 0.60, piercing: -0.40 } }
+    omega_cube_nm: { name: 'THE OMEGA CUBE', baseHp: 20000000, shieldHp: 5000000, speed: 0.125, color: '#ffffffff', size: 80, hasShield: true, isBoss: false, showHpBar: true, loopcount: 1, insaneLoopcount: 2, loopSummonType: 'omegasummon_nm', loopSummonCount: 2, isSummoner: true, resistances: { global: 0.10, bullet: 0.20, laser: 0.20, piercing: 0.1, explosive: 0.30, summonerRange: 0.2, summonerCollision: 0.2 } },
+    omegasummon_nm: { name: 'Omega Summon', baseHp: 500000, speed: 0.35, color: '#ffffffff', size: 25, isBoss: true, isSummoned: true, summonType: 'omegasummon_nm', resistances: { global: 0.60, piercing: -0.40, summonerRange: 0.5, summonerCollision: 0.5 } },
+    // Secret-Wave
+    Lunar_Cube: { name: 'Lunar Cube', baseHp: 100000, shieldHp: 100000, speed: 0.3, color: '#ffffffff', size: 35, hasShield: true, isBoss: true, resistances: { global: 0.20, bullet: 0.40, laser: 0.40, piercing: 0.10, explosive: 0.5, summonerRange: 0.3, summonerCollision: 0.4 } },
+    Lunar_Gargantuar: { name: 'Lunar Gargantuar', baseHp: 350000, shieldHp: 50000, speed: 0.2, color: '#ffffffff', size: 40, hasShield: true, isBoss: true, resistances: { global: 0.20, bullet: 0.30, laser: 0.30, piercing: 0.10, explosive: 0.4, summonerRange: 0.3, summonerCollision: 0.3 } },
+    Lunar_Titan: { name: 'Lunar Titan Cube', baseHp: 1000000, shieldHp: 500000, speed: 0.265, color: '#ffffffff', size: 45, hasShield: true, isBoss: true, showHpBar: true, resistances: { global: 0.20, bullet: 0.40, laser: 0.40, piercing: 0.10, explosive: 0.5, summonerRange: 0.3, summonerCollision: 0.4 } },
+    Moon_Cube: { name: 'The Moon Cube', baseHp: 10000000, shieldHp: 10000000, speed: 0.225, color: '#ffffff80', size: 60, hasShield: true, isBoss: false, showHpBar: true, loopcount: 1, insaneLoopcount: 2, isSummoner: true, resistances: { global: 0.20, bullet: 0.60, laser: 0.60, piercing: 0.2, explosive: 0.50, summonerRange: 0.6, summonerCollision: 0.6 } }
+
 };
 
 // Expose to window for command terminal
