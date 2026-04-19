@@ -430,7 +430,7 @@ const TOWER_TYPES = {
         name: 'Rocketer Paragon',
         color: '#FF6A00',
         cost: 125000,
-        damageType: 'explosive',
+        damageType: 'piercing',
         aoe: true,
         summons: false,
         size: 2,
