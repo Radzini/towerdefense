@@ -8,6 +8,7 @@ const CBASE_TOWER_TYPE = {
     summons: true,
     isCBase: true,
     size: 5,
+    footprint: { width: 5, height: 5 },
     limit: 1,
     levels: [
         {
@@ -153,7 +154,6 @@ const CBASE_EXECUTIONER = {
     isCBaseSummon: true,
     cbaseUnitType: 'EXECUTIONER',
     armadaCapacity: 20,
-    potencyPerHit: 2,
     missileDamage: 6000,
     missileCount: 5,
     missileAOERadius: 2,
@@ -189,7 +189,6 @@ const CBASE_CRUSADER = {
     isCBaseSummon: true,
     cbaseUnitType: 'CRUSADER',
     armadaCapacity: 20,
-    potencyPerHit: 3,
     spawnCooldown: 80000,
     spawnArmadaCost: 8,
     fragmentCount: 12,
@@ -224,6 +223,12 @@ let cbase_death_potency_last_trigger = -99999;
 let cbase_current_wave_tracked = -1;
 let cbase_pending_timeouts = [];
 let cbase_last_exec_crusader_gift_time = 0;
+let cbase_distribution_rotors = {
+    priority: 0,
+    fallback: 0,
+    syphon: 0,
+    all: 0
+};
 
 function cbase_register_summon_types() {
     if (typeof SUMMON_TYPES === 'undefined') return;
@@ -326,6 +331,16 @@ function cbase_feed_random_resonator(amount) {
     cbase_add_armada_power(chosen, amount);
 }
 
+function cbase_distribute_armada_power_round_robin(targets, total, bucketKey) {
+    if (!Array.isArray(targets) || targets.length === 0 || total <= 0) return;
+    const rotorKey = bucketKey || 'all';
+    const startIndex = cbase_distribution_rotors[rotorKey] % targets.length;
+    for (let i = 0; i < total; i++) {
+        cbase_add_armada_power(targets[(startIndex + i) % targets.length], 1);
+    }
+    cbase_distribution_rotors[rotorKey] = (startIndex + total) % targets.length;
+}
+
 function cbase_spawn_unit(unitTypeDef, towerX, towerY) {
     if (!path || path.length === 0) return null;
     const now = performance.now();
@@ -390,7 +405,9 @@ function cbase_spawn_unit(unitTypeDef, towerX, towerY) {
         resonatorOverheat: 0,
         resonatorLockedTarget: null,
         resonatorOrbCooldownUntil: 0,
-        resonatorBigOrb: null
+        resonatorBigOrb: null,
+        resonatorOrbAngle: 0,
+        lastResonatorOrbitUpdate: now
     };
     const startsWithAP = ['RESONATOR', 'EXECUTIONER', 'CRUSADER'];
     if (startsWithAP.includes(unitTypeDef.cbaseUnitType)) entity.armadaPower = entity.potency = 1;
@@ -568,17 +585,11 @@ function cbase_apply_death_potency(totalPotency, timestamp, sourceEnemy = null) 
     if (priority.length > 0) {
         const priorityPool = Math.min(totalPotency, Math.ceil(totalPotency * 0.67));
         const otherPool = totalPotency - priorityPool;
-        for (let i = 0; i < priorityPool; i++) {
-            cbase_add_armada_power(priority[i % priority.length], 1);
-        }
+        cbase_distribute_armada_power_round_robin(priority, priorityPool, 'priority');
         const fallbackTargets = others.length > 0 ? others : priority;
-        for (let i = 0; i < otherPool; i++) {
-            cbase_add_armada_power(fallbackTargets[i % fallbackTargets.length], 1);
-        }
+        cbase_distribute_armada_power_round_robin(fallbackTargets, otherPool, 'fallback');
     } else {
-        for (let i = 0; i < totalPotency; i++) {
-            cbase_add_armada_power(allUnits[i % allUnits.length], 1);
-        }
+        cbase_distribute_armada_power_round_robin(allUnits, totalPotency, 'all');
     }
 
     if (sourceEnemy) {
@@ -698,6 +709,18 @@ function update_cbase_impaler(unit, timestamp) {
 }
 
 function update_cbase_resonator(unit, timestamp) {
+    if (!Number.isFinite(unit.resonatorOrbAngle)) {
+        unit.resonatorOrbAngle = ((unit.spawnTime || timestamp) * 0.001) % (Math.PI * 2);
+    }
+    if (!Number.isFinite(unit.lastResonatorOrbitUpdate)) {
+        unit.lastResonatorOrbitUpdate = timestamp;
+    }
+    const orbitDelta = Math.max(0, timestamp - unit.lastResonatorOrbitUpdate);
+    const damageRatio = Math.max(0, Math.min(1, ((unit.resonatorBeamDamage || unit.type.orbBeamDamage) - unit.type.orbBeamDamage) / Math.max(1, unit.type.orbBeamDamageMax - unit.type.orbBeamDamage)));
+    const orbitSpeed = 0.0025 + damageRatio * 0.0075;
+    unit.resonatorOrbAngle = (unit.resonatorOrbAngle + orbitDelta * orbitSpeed) % (Math.PI * 2);
+    unit.lastResonatorOrbitUpdate = timestamp;
+
     if (unit.resonatorBigOrb) {
         const orb = unit.resonatorBigOrb;
         const target = orb.target;
@@ -1140,8 +1163,9 @@ function update_cbase_units(timestamp) {
                 if (cbase_get_armada_power(source) > 0) {
                     cbase_add_armada_power(source, -1); // Drain fuel
 
-                    // Give to a random Executioner or Crusader
-                    const target = bigUnits[Math.floor(Math.random() * bigUnits.length)];
+                    // Rotate fairly so one big unit doesn't starve the others.
+                    const target = bigUnits[cbase_distribution_rotors.syphon % bigUnits.length];
+                    cbase_distribution_rotors.syphon = (cbase_distribution_rotors.syphon + 1) % bigUnits.length;
                     cbase_add_armada_power(target, 1);
                 }
             });
@@ -1250,8 +1274,7 @@ function draw_cbase_resonator(ctxRef, unit, now) {
     const beamDamage = unit.resonatorBeamDamage || baseDamage;
     const damageRatio = Math.max(0, Math.min(1, (beamDamage - baseDamage) / Math.max(1, maxDamage - baseDamage)));
     const orbitRadius = unit.size * 0.95;
-    const orbitSpeed = 0.0025 + damageRatio * 0.0075;
-    const baseAngle = now * orbitSpeed + (unit.spawnTime || 0) * 0.001;
+    const baseAngle = unit.resonatorOrbAngle || 0;
 
     if (!unit.resonatorBigOrb && now >= (unit.resonatorOrbCooldownUntil || 0)) {
         for (let i = 0; i < unit.type.orbCount; i++) {

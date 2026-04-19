@@ -72,7 +72,7 @@ const MAFIA_TOWER_TYPE = {
             reloadTime: 0,
             // crit passive
             critChance: 0.10,
-            critMultiplier: 1.05,
+            critMultiplier: 1.1,
             critReloadBonus: 0.02,
             critMaxChance: 0.40,
             // no summons
@@ -128,7 +128,7 @@ const MAFIA_TOWER_TYPE = {
             },
             hasMafiaTarget: true,
             mafiaTargetHpThreshold: 50000,
-            reloadCash: 300
+            reloadCash: 200
         },
         // ── Level 4 ──
         // 400 damage, 3 burst, 0.4s between shots, 2s reload
@@ -158,7 +158,7 @@ const MAFIA_TOWER_TYPE = {
             mafiaTargetHpThreshold: 50000,
             // crit per mafia target count on self
             critPerMafiaTarget: 0.05,
-            reloadCash: 750,
+            reloadCash: 500,
             // bomb passive
             hasBomb: true,
             bombHpThreshold: 100000,
@@ -682,8 +682,7 @@ function activate_mafia_ability(tower, ability_id) {
         // Enter targeting mode
         mafia_targeting_active = true;
         mafia_targeting_data = { tower: tower, ability_id: 'bounty' };
-        const canvas = document.getElementById('gameCanvas');
-        if (canvas) canvas.style.cursor = 'crosshair';
+        if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
 
         // Close tower info panel
         const towerInfoPanel = document.getElementById('towerInfoPanel');
@@ -702,8 +701,7 @@ function activate_mafia_ability(tower, ability_id) {
 
         mafia_targeting_active = true;
         mafia_targeting_data = { tower: tower, ability_id: 'target' };
-        const canvas = document.getElementById('gameCanvas');
-        if (canvas) canvas.style.cursor = 'crosshair';
+        if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
 
         const towerInfoPanel = document.getElementById('towerInfoPanel');
         const towerActions = document.getElementById('towerActions');
@@ -721,8 +719,7 @@ function activate_mafia_ability(tower, ability_id) {
 
         mafia_targeting_active = true;
         mafia_targeting_data = { tower: tower, ability_id: 'traps' };
-        const canvas = document.getElementById('gameCanvas');
-        if (canvas) canvas.style.cursor = 'crosshair';
+        if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
 
         const towerInfoPanel = document.getElementById('towerInfoPanel');
         const towerActions = document.getElementById('towerActions');
@@ -740,6 +737,7 @@ function execute_mafia_targeted_ability(enemy) {
     if (typeof window.isTowerStunned === 'function' && window.isTowerStunned(tower)) {
         mafia_targeting_active = false;
         mafia_targeting_data = null;
+        if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
         return;
     }
     const ability_id = mafia_targeting_data.ability_id;
@@ -822,8 +820,7 @@ function execute_mafia_targeted_ability(enemy) {
     // Clear targeting mode
     mafia_targeting_active = false;
     mafia_targeting_data = null;
-    const canvas = document.getElementById('gameCanvas');
-    if (canvas) canvas.style.cursor = 'default';
+    if (typeof refreshCanvasCursor === 'function') refreshCanvasCursor();
 
     // Re-select tower and show panel to make it feel fluid
     window.selectedCell = { x: Math.floor(tower.x / window.GRID_SIZE), y: Math.floor(tower.y / window.GRID_SIZE) };

@@ -70,10 +70,10 @@ const TOWER_TYPES = {
         aoe: false,
         summons: false,
         levels: [
-            { damage: 3, fireRate: 100, range: 4, upgradeCost: 0 },
-            { damage: 5, fireRate: 90, range: 6, upgradeCost: 750 },
-            { damage: 8, fireRate: 80, range: 7, upgradeCost: 2000 },
-            { damage: 12, fireRate: 40, range: 8, upgradeCost: 5000 }
+            { damage: 4, fireRate: 100, range: 4, upgradeCost: 0 },
+            { damage: 6, fireRate: 90, range: 6, upgradeCost: 750 },
+            { damage: 10, fireRate: 80, range: 7, upgradeCost: 2000 },
+            { damage: 15, fireRate: 40, range: 8, upgradeCost: 5000 }
         ]
     },
 
@@ -101,10 +101,10 @@ const TOWER_TYPES = {
         summons: false,
         farm: true,
         levels: [
-            { cashPerWave: 100, upgradeCost: 0 },
-            { cashPerWave: 200, upgradeCost: 1000 },
-            { cashPerWave: 500, upgradeCost: 2000 },
-            { cashPerWave: 2000, upgradeCost: 5000 }
+            { cashPerWave: 200, upgradeCost: 0 },
+            { cashPerWave: 500, upgradeCost: 1000 },
+            { cashPerWave: 2000, upgradeCost: 4000 },
+            { cashPerWave: 5000, upgradeCost: 10000 }
         ]
     },
 
@@ -130,6 +130,7 @@ const TOWER_TYPES = {
         aoe: false,
         summons: true,
         size: 2,
+        footprint: { width: 2, height: 2 },
         limit: 1,
         abilityCooldown: 120000,
         levels: [
@@ -320,6 +321,7 @@ const TOWER_TYPES = {
         limit: 1,
         maxActiveSummons: 3,
         size: 3,
+        footprint: { width: 3, height: 3 },
         globalSpawnCooldown: 10000,
         cooldownReductionOnUpgrade: 10000,
         levels: [
@@ -337,6 +339,7 @@ const TOWER_TYPES = {
         aoe: false,
         summons: false,
         size: 2,
+        footprint: { width: 2, height: 2 },
         limit: 1,
         isParagon: true,
         cannotBeBuffed: true,
@@ -349,7 +352,7 @@ const TOWER_TYPES = {
         betaCooldown: 180000,
         levels: [
             {
-                damage: 75,
+                damage: 100,
                 fireRate: 100,
                 range: 5,
                 radian: 1,
@@ -358,7 +361,7 @@ const TOWER_TYPES = {
                 upgradeCost: 0
             },
             {
-                damage: 125,
+                damage: 175,
                 fireRate: 80,
                 range: 8,
                 radian: 2,
@@ -368,14 +371,13 @@ const TOWER_TYPES = {
                 upgradeCost: 0
             },
             {
-                damage: 200,
+                damage: 250,
                 fireRate: 50,
                 range: 10,
                 radian: 3,
                 baseHp: 1000,
                 hasAlpha: true,
                 alphaMultiplier: 100,
-                hasBeta: true,
                 upgradeCost: 0
             }
         ]
@@ -389,6 +391,7 @@ const TOWER_TYPES = {
         aoe: false,
         summons: false,
         size: 2,
+        footprint: { width: 2, height: 2 },
         limit: 1,
         isParagon: true,
         cannotBeBuffed: true,
@@ -410,13 +413,79 @@ const TOWER_TYPES = {
             },
             {
                 damage: 20000,
-                fireRate: 2500,
+                fireRate: 4000,
                 range: 15,
                 radian: 3,
                 explosionDamage: 5000,
                 explosionDelay: 500,
                 sniperBuff: 75,
                 railgunnerBuff: 200,
+                hasBeta: true,
+                upgradeCost: 0
+            }
+        ]
+    },
+
+    ROCKETER_PARAGON: {
+        name: 'Rocketer Paragon',
+        color: '#FF6A00',
+        cost: 125000,
+        damageType: 'explosive',
+        aoe: true,
+        summons: false,
+        size: 2,
+        footprint: { width: 2, height: 2 },
+        limit: 1,
+        isParagon: true,
+        cannotBeBuffed: true,
+        clusterCost: 100000,
+        clusterCooldown: 180000,
+        clusterRequiredMaxedRocketers: 10,
+        clusterDamagePerHit: 500,
+        clusterHitCount: 100,
+        clusterMoabDamage: 250000,
+        clusterSlowAmount: 0.05,
+        levels: [
+            {
+                damage: 750,
+                directDamage: 550,
+                fireRate: 2500,
+                range: 5,
+                radian: 1,
+                explosionTiles: 2,
+                passiveRocketerMultiplier: 2,
+                upgradeCost: 0
+            },
+            {
+                damage: 2000,
+                directDamage: 1500,
+                fireRate: 2000,
+                range: 6,
+                radian: 2,
+                explosionTiles: 3,
+                passiveRocketerMultiplier: 2,
+                acidDamage: 50,
+                acidTickRate: 200,
+                acidPoolLengthTiles: 2,
+                acidPoolDuration: 3000,
+                acidEnemyDuration: 7000,
+                acidCooldown: 10000,
+                upgradeCost: 0
+            },
+            {
+                damage: 6000,
+                directDamage: 6000,
+                fireRate: 2000,
+                range: 8,
+                radian: 3,
+                explosionTiles: 4,
+                passiveRocketerMultiplier: 2,
+                acidDamage: 250,
+                acidTickRate: 200,
+                acidPoolLengthTiles: 3,
+                acidPoolDuration: 5000,
+                acidEnemyDuration: 10000,
+                acidCooldown: 10000,
                 upgradeCost: 0
             }
         ]
@@ -453,6 +522,7 @@ const TOWER_TYPES = {
         summons: true,
         isCBase: true,
         size: 5,
+        footprint: { width: 5, height: 5 },
         limit: 1,
         levels: []
     }
@@ -471,10 +541,6 @@ const SUMMON_TYPES = {
     GRAY_L4: { name: 'Gray Cube L4', color: 'gray', hp: 150, speed: 0.6, size: 20, isSummon: true },
     DARK_RED: { name: 'Dark Red Cube', color: 'darkred', hp: 500, speed: 0.3, size: 30, isSummon: true },
     DARK_RED_L5: { name: 'Dark Red Cube L5', color: 'darkred', hp: 1000, speed: 0.3, size: 30, isSummon: true },
-
-    // Gunner Paragon summons
-    PARAGON_BASE: { name: 'Paragon Cube', color: '#FF00FF', hp: 250, speed: 1.2, size: 20, isSummon: true },
-    PARAGON_ALPHA: { name: 'Alpha Cube', color: '#FFD700', hp: 2500, speed: 1.0, size: 30, isSummon: true },
 
     // Beta Protocol summons (Gunner Paragon L3)
     BETA_GRAY: {
@@ -504,7 +570,7 @@ const SUMMON_TYPES = {
     BETA_YELLOW: {
         name: 'Beta Yellow Cube',
         color: '#FFFF00',
-        hp: 35000,
+        hp: 25000,
         speed: 0.25,
         size: 32,
         isSummon: true,
@@ -665,162 +731,6 @@ const SUMMON_TYPES = {
         speed: 0.4,
         size: 27,
         isSummon: true,
-        damage: 1000,
-        fireRate: 1000,
-        range: 14
-    },
-    PINK_SQUARE_L5: {
-        name: 'Pink Square L5',
-        color: 'pink',
-        hp: 2000,
-        speed: 0.5,
-        size: 27,
-        isSummon: true,
-        burstDamage: 125,
-        burstCount: 20,
-        burstFireRate: 50,
-        burstCooldown: 1500,
-        range: 12
-    },
-    DARK_BLUE_SQUARE_L5: {
-        name: 'Dark Blue Square L5',
-        color: 'darkblue',
-        hp: 10000,
-        speed: 0.3,
-        size: 35,
-        isSummon: true,
-        selfDestructDamage: 5000
-    },
-
-    // Paragon Beta summons (alternative)
-    PARAGON_GRAY: {
-        name: 'Gray Cube',
-        color: '#808080',
-        hp: 2000,
-        speed: 0.4,
-        size: 20,
-        isSummon: true,
-        damage: 444,
-        fireRate: 500,
-        range: 7
-    },
-    PARAGON_BLACK: {
-        name: 'Black Cube',
-        color: '#000000',
-        hp: 5000,
-        speed: 0.4,
-        size: 22,
-        isSummon: true,
-        damage: 600,
-        fireRate: 1000,
-        range: 8
-    },
-    PARAGON_PURPLE: {
-        name: 'Purple Cube',
-        color: '#800080',
-        hp: 25000,
-        speed: 0.4,
-        size: 25,
-        isSummon: true,
-        damage: 50,
-        fireRate: 500,
-        range: 5
-    },
-    PARAGON_GRAY_SHIELD: {
-        name: 'Gray Cube Shield',
-        color: '#A9A9A9',
-        hp: 600,
-        shieldHp: 400,
-        speed: 0.4,
-        size: 20,
-        isSummon: true,
-        hasShield: true
-    },
-
-    // Cube Factory summons
-    FACTORY_CUBE_L1: {
-        name: 'Factory Cube L1',
-        color: '#8B0000',
-        hp: 40000,
-        speed: 0.25,
-        size: 35,
-        isSummon: true,
-        range: 16,
-        minigunDamage: 250,
-        minigunFireRate: 100,
-        rocketDamage: 500,
-        rocketDirectDamage: 1000,
-        rocketFireRate: 250,
-        rocketCount: 4,
-        rocketCooldown: 3000,
-        rocketAOERange: 2
-    },
-    FACTORY_CUBE_L2: {
-        name: 'Factory Cube L2',
-        color: '#CD5C5C',
-        hp: 85000,
-        speed: 0.22,
-        size: 40,
-        isSummon: true,
-        range: 12,
-        minigunDamage: 500,
-        minigunFireRate: 100,
-        rocketDamage: 1000,
-        rocketDirectDamage: 2000,
-        rocketFireRate: 200,
-        rocketCount: 4,
-        rocketCooldown: 4000,
-        rocketAOERange: 3,
-        railgunDamage: 10000,
-        railgunCooldown: 7000,
-        railgunRange: 100,
-        knockbackCooldown: 6000,
-        knockbackExplosionRange: 3,
-        knockbackExplosionDamage: 4000,
-        knockbackDirectDamage: 6000,
-        knockbackPower: 3,
-        isBossKnockbacker: true
-    },
-    FACTORY_CUBE_L3: {
-        name: 'Factory Cube L3',
-        color: '#FFD700',
-        hp: 250000,
-        speed: 0.2,
-        size: 54,
-        isSummon: true,
-        range: 14,
-        minigunDamage: 1000,
-        minigunFireRate: 80,
-        rocketDamage: 2500,
-        rocketDirectDamage: 6000,
-        rocketFireRate: 200,
-        rocketCount: 5,
-        rocketCooldown: 6000,
-        rocketAOERange: 5,
-        railgunDamage: 25000,
-        railgunCooldown: 4000,
-        railgunRange: Infinity,
-        isBossKnockbacker: true,
-        knockbackCooldown: 6000,
-        knockbackPower: 5
-    },
-
-    DARK_BLUE_SQUARE: {
-        name: 'Dark Blue Square',
-        color: 'darkblue',
-        hp: 5000,
-        speed: 0.3,
-        size: 30,
-        isSummon: true,
-        selfDestructDamage: 2000
-    },
-    GREEN_SQUARE: {
-        name: 'Green Square',
-        color: 'green',
-        hp: 2500,
-        speed: 0.4,
-        size: 27,
-        isSummon: true,
         damage: 2000,
         fireRate: 1000,
         range: 14
@@ -876,52 +786,7 @@ const SUMMON_TYPES = {
         mainRailgunFireRate: 250,
         mainRailgunCooldown: 15000,
         mainRailgunUses: 2,
-        range: 22
-    },
-
-    // Paragon Beta summons (alternative)
-    PARAGON_GRAY: {
-        name: 'Gray Cube',
-        color: '#808080',
-        hp: 2000,
-        speed: 0.4,
-        size: 20,
-        isSummon: true,
-        damage: 444,
-        fireRate: 500,
-        range: 7
-    },
-    PARAGON_BLACK: {
-        name: 'Black Cube',
-        color: '#000000',
-        hp: 5000,
-        speed: 0.4,
-        size: 22,
-        isSummon: true,
-        damage: 600,
-        fireRate: 1000,
-        range: 8
-    },
-    PARAGON_PURPLE: {
-        name: 'Purple Cube',
-        color: '#800080',
-        hp: 25000,
-        speed: 0.4,
-        size: 25,
-        isSummon: true,
-        damage: 50,
-        fireRate: 500,
-        range: 5
-    },
-    PARAGON_GRAY_SHIELD: {
-        name: 'Gray Cube Shield',
-        color: '#A9A9A9',
-        hp: 600,
-        shieldHp: 400,
-        speed: 0.4,
-        size: 20,
-        isSummon: true,
-        hasShield: true
+        range: 20
     },
 
     // Cube Factory summons
@@ -1051,12 +916,12 @@ const SUMMON_TYPES = {
     MAFIA_GOLDEN_GUNNER: typeof MAFIA_GOLDEN_GUNNER !== 'undefined' ? MAFIA_GOLDEN_GUNNER : { name: 'Golden Gunner', color: '#FFD700', hp: 10000, speed: 0.25, size: 28, isSummon: true, damage: 1000, fireRate: 500, range: 8, isMafiaGunner: true, stopsToShoot: true },
 
     // C-Base tower summons (registered by CBase.js cbase_register_summon_types)
-    CBASE_CASTER:      typeof CBASE_CASTER      !== 'undefined' ? CBASE_CASTER      : { name: 'Caster',      color: '#FF0000', hp: 500,    speed: 0.35, size: 18, isSummon: true, isCBaseSummon: true },
-    CBASE_OPPRESSOR:   typeof CBASE_OPPRESSOR   !== 'undefined' ? CBASE_OPPRESSOR   : { name: 'Oppressor',   color: '#FF0000', hp: 3000,   speed: 0.3,  size: 24, isSummon: true, isCBaseSummon: true },
-    CBASE_IMPALER:     typeof CBASE_IMPALER     !== 'undefined' ? CBASE_IMPALER     : { name: 'Impaler',     color: '#FF0000', hp: 6000,   speed: 0.25, size: 28, isSummon: true, isCBaseSummon: true },
-    CBASE_RESONATOR:   typeof CBASE_RESONATOR   !== 'undefined' ? CBASE_RESONATOR   : { name: 'Resonator',   color: '#F06292', hp: 5000,   speed: 0.35, size: 35, isSummon: true, isCBaseSummon: true },
-    CBASE_EXECUTIONER: typeof CBASE_EXECUTIONER !== 'undefined' ? CBASE_EXECUTIONER : { name: 'Executioner', color: '#6B0000', hp: 50000,  speed: 0.15, size: 40, isSummon: true, isCBaseSummon: true },
-    CBASE_CRUSADER:    typeof CBASE_CRUSADER    !== 'undefined' ? CBASE_CRUSADER    : { name: 'Crimson Crusader', color: '#A00000', hp: 200000, speed: 0.12, size: 54, isSummon: true, isCBaseSummon: true }
+    CBASE_CASTER: typeof CBASE_CASTER !== 'undefined' ? CBASE_CASTER : { name: 'Caster', color: '#FF0000', hp: 500, speed: 0.35, size: 18, isSummon: true, isCBaseSummon: true },
+    CBASE_OPPRESSOR: typeof CBASE_OPPRESSOR !== 'undefined' ? CBASE_OPPRESSOR : { name: 'Oppressor', color: '#FF0000', hp: 3000, speed: 0.3, size: 24, isSummon: true, isCBaseSummon: true },
+    CBASE_IMPALER: typeof CBASE_IMPALER !== 'undefined' ? CBASE_IMPALER : { name: 'Impaler', color: '#FF0000', hp: 6000, speed: 0.25, size: 28, isSummon: true, isCBaseSummon: true },
+    CBASE_RESONATOR: typeof CBASE_RESONATOR !== 'undefined' ? CBASE_RESONATOR : { name: 'Resonator', color: '#F06292', hp: 5000, speed: 0.35, size: 35, isSummon: true, isCBaseSummon: true },
+    CBASE_EXECUTIONER: typeof CBASE_EXECUTIONER !== 'undefined' ? CBASE_EXECUTIONER : { name: 'Executioner', color: '#6B0000', hp: 50000, speed: 0.15, size: 40, isSummon: true, isCBaseSummon: true },
+    CBASE_CRUSADER: typeof CBASE_CRUSADER !== 'undefined' ? CBASE_CRUSADER : { name: 'Crimson Crusader', color: '#A00000', hp: 200000, speed: 0.12, size: 54, isSummon: true, isCBaseSummon: true }
 };
 
 // Expose to window for command terminal

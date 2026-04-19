@@ -8,6 +8,7 @@ const CARRIER_CUBE_TYPE = {
     summons: false,
     isCarrier: true,
     size: 4,
+    footprint: { width: 4, height: 4 },
     limit: 1,
     hardLimit: 1,
     efficiencyCap: 20,
