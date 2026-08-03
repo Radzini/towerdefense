@@ -105,16 +105,16 @@ const MAFIA_TOWER_TYPE = {
             reloadCash: 50
         },
         // ── Level 3 ──
-        // 200 damage, 3 burst, 0.4s between shots, 2s reload
+        // 100 damage, 3 burst, 0.4s between shots, 2s reload
         // Spawns Gunner L2 (500hp, 50dmg/0.6s, every 40s)
         // Passives: crit 20% base x1.10, +2%/reload max 50%, mafia target ON, +100$/reload
         // Ability 1: Bounty (5% maxHP, max 5000, 60s CD)
         // Ability 2: Target (+1 mafia target/shot 3s, max 10, 50s CD)
         {
-            damage: 200,
+            damage: 100,
             fireRate: 400,
             range: 6,
-            upgradeCost: 5400,
+            upgradeCost: 6000,
             burstCount: 3,
             reloadTime: 2000,
             critChance: 0.20,
@@ -123,7 +123,7 @@ const MAFIA_TOWER_TYPE = {
             critMaxChance: 0.50,
             summons: [{ type: 'MAFIA_GUNNER_L2', spawnRate: 50000 }],
             abilities: {
-                bounty: { hpPercent: 0.05, maxCash: 5000, cooldown: 60000 },
+                bounty: { hpPercent: 0.06, maxCash: 7500, cooldown: 60000 },
                 target: { stacksPerShot: 1, duration: 3000, maxStacks: 10, failReduce: 2, failFireRateDebuff: 0.20, failDebuffDuration: 6000, decayRate: 10000, damageBonus: 0.15, cooldown: 50000 }
             },
             hasMafiaTarget: true,
@@ -138,7 +138,7 @@ const MAFIA_TOWER_TYPE = {
         // Ability 2: Traps (-25% speed 8s, 50s CD, GLOBAL)
         // Ability 3: Target (+2 mafia target/shot 3s, max 10, 50s CD)
         {
-            damage: 400,
+            damage: 300,
             fireRate: 400,
             range: 7,
             upgradeCost: 20000,
@@ -150,7 +150,7 @@ const MAFIA_TOWER_TYPE = {
             critMaxChance: 0.60,
             summons: [{ type: 'MAFIA_GOLDEN_GUNNER', spawnRate: 80000 }],
             abilities: {
-                bounty: { hpPercent: 0.10, maxCash: 20000, cooldown: 80000 },
+                bounty: { hpPercent: 0.10, maxCash: 25000, cooldown: 80000 },
                 traps: { speedDebuff: 0.25, duration: 8000, cooldown: 50000, isGlobal: true },
                 target: { stacksPerShot: 2, duration: 3000, maxStacks: 10, failReduce: 3, failFireRateDebuff: 0.20, failDebuffDuration: 6000, decayRate: 10000, damageBonus: 0.30, cooldown: 50000 }
             },
@@ -161,7 +161,7 @@ const MAFIA_TOWER_TYPE = {
             reloadCash: 500,
             // bomb passive
             hasBomb: true,
-            bombHpThreshold: 100000,
+            bombHpThreshold: 50000,
             bombDamage: 6000,
             bombMaxHpPercent: 0.02,
             bombExplosionDamage: 1500,
@@ -246,6 +246,10 @@ function update_mafia_towers(timestamp) {
     for (const tower of towers) {
         if (!tower.type || !tower.type.isMafia) continue;
         if (typeof window.isTowerStunned === 'function' && window.isTowerStunned(tower, timestamp)) continue;
+        if (tower.type.isGoldenMafia && typeof updateGoldenMafiaTower === 'function') {
+            updateGoldenMafiaTower(tower, timestamp);
+            continue;
+        }
         if (tower.level < 1 || tower.level > tower.type.levels.length) continue;
 
         const stats = tower.type.levels[tower.level - 1];
@@ -400,11 +404,7 @@ function update_mafia_towers(timestamp) {
 
                     // Mark that it was hit by mafia
                     tower.target._lastHitByMafia = true;
-                    applyDamage(tower.target, shotDamage, tower.type.damageType || 'piercing');
-
-                    if (wasAlive && tower.target.hp <= 0 && hadHighHp) {
-                        m.selfMafiaTargetCount += 1; // reward for killing big enemy
-                    }
+                    applyDamage(tower.target, shotDamage, tower.type.damageType || 'piercing', undefined, { fireRate: buffedFireRate });
 
                     // Projectile visual
                     projectiles.push({
@@ -459,7 +459,7 @@ function update_mafia_towers(timestamp) {
 
                 // Mark that it was hit by mafia
                 tower.target._lastHitByMafia = true;
-                applyDamage(tower.target, shotDamage, tower.type.damageType || 'piercing');
+                applyDamage(tower.target, shotDamage, tower.type.damageType || 'piercing', undefined, { fireRate: buffedFireRate });
 
                 if (wasAlive && tower.target.hp <= 0 && hadHighHp) {
                     m.selfMafiaTargetCount += 1; // reward for killing big enemy
@@ -644,7 +644,7 @@ function update_mafia_gunners(timestamp) {
 
             if (timestamp - (entity.lastFired || 0) >= entity.type.fireRate) {
                 nearestEnemy._lastHitByMafia = true;
-                applyDamage(nearestEnemy, entity.type.damage, 'piercing');
+                applyDamage(nearestEnemy, entity.type.damage, 'piercing', undefined, { fireRate: entity.type.fireRate });
                 entity.lastFired = timestamp;
 
                 // Projectile visual
@@ -831,6 +831,10 @@ function execute_mafia_targeted_ability(enemy) {
 
 // ───────────────────────── TOWER INFO HTML ─────────────────────────
 function get_mafia_info_html(tower) {
+    if (tower.type.isGoldenMafia && typeof get_golden_mafia_info_html === 'function') {
+        if (!tower.goldenMafia && typeof initGoldenMafiaState === 'function') initGoldenMafiaState(tower);
+        return get_golden_mafia_info_html(tower);
+    }
     const stats = tower.type.levels[tower.level - 1];
     const m = tower.mafia || {};
     const buffs = tower.type.cannotBeBuffed ? { rangeBoost: 0, fireRateBoost: 0, damageBoost: 0 } : getCommanderBuffs(tower);

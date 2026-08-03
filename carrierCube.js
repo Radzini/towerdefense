@@ -224,7 +224,7 @@ function updateCarrierUnits() {
                 const firstEnemy = validEnemies.length > 0 ? validEnemies[0] : null;
 
                 if (firstEnemy) {
-                    applyDamage(firstEnemy, currentDamage);
+                    applyDamage(firstEnemy, currentDamage, undefined, undefined, { fireRate: unit.type.fireRate });
                     unit.target = firstEnemy; // Store target for drawing
                 } else {
                     unit.target = null;
@@ -255,7 +255,7 @@ function updateCarrierUnits() {
                     for (let i = 0; i < unit.type.burstCount; i++) {
                         setTimeout(() => {
                             if (unit.target && unit.target.hp > 0) {
-                                applyDamage(unit.target, unit.type.damage);
+                                applyDamage(unit.target, unit.type.damage, undefined, undefined, { fireRate: unit.type.burstRate });
                                 projectiles.push({
                                     x1: unit.x,
                                     y1: unit.y,
@@ -307,7 +307,7 @@ function updateCarrierUnits() {
                 const validTargets = enemies.filter(e => !e.isSummon && e.hp > 0);
                 if (validTargets.length > 0) {
                     const randomTarget = validTargets[Math.floor(Math.random() * validTargets.length)];
-                    applyDamage(randomTarget, unit.type.minigunDamage);
+                    applyDamage(randomTarget, unit.type.minigunDamage, undefined, undefined, { fireRate: unit.type.minigunRate });
                     projectiles.push({
                         x1: unit.x,
                         y1: unit.y,

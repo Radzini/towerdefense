@@ -256,9 +256,9 @@ function generateHardWaves() {
         // Wave 30
         {
             groups: [
-                { enemies: { guardian_cube_2: 1 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { cube_of_doom: 1 }, spawnInterval: 1000, waitAfter: 0 }
             ],
-            endWaitTime: 15000
+            endWaitTime: 50000
         },
 
         // ===== LATE GAME (Waves 31-40) =====
@@ -266,7 +266,8 @@ function generateHardWaves() {
         {
             groups: [
                 { enemies: { eclise_boss_cube_hard: 2 }, spawnInterval: 1000, waitAfter: 1000 },
-                { enemies: { crystal_boss_cube_hard: 2 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { crystal_boss_cube_hard: 2 }, spawnInterval: 1000, waitAfter: 2000 },
+                { enemies: { rock_cube: 1 }, spawnInterval: 1000, waitAfter: 2000 }
             ],
             endWaitTime: 15000
         },
@@ -284,7 +285,8 @@ function generateHardWaves() {
                 { enemies: { red_cube_hard: 90 }, spawnInterval: 150, waitAfter: 500 },
                 { enemies: { blue_cube_hard: 80 }, spawnInterval: 150, waitAfter: 500 },
                 { enemies: { gray_cube_hard: 70 }, spawnInterval: 200, waitAfter: 500 },
-                { enemies: { lava_cube_hard: 60 }, spawnInterval: 200, waitAfter: 0 }
+                { enemies: { lava_cube_hard: 60 }, spawnInterval: 200, waitAfter: 750 },
+                { enemies: { rock_cube: 3 }, spawnInterval: 420, waitAfter: 0 }
             ],
             endWaitTime: 15000
         },
@@ -300,7 +302,9 @@ function generateHardWaves() {
         {
             groups: [
                 { enemies: { guardian_cube_2: 2 }, spawnInterval: 1000, waitAfter: 1000 },
-                { enemies: { gargantuar_x: 3 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { gargantuar_x: 3 }, spawnInterval: 1000, waitAfter: 0 },
+                { enemies: { rock_cube: 2 }, spawnInterval: 420, waitAfter: 1000 },
+                { enemies: { rock_cube: 2 }, spawnInterval: 420, waitAfter: 0 }
             ],
             endWaitTime: 15000
         },
@@ -317,7 +321,9 @@ function generateHardWaves() {
         {
             groups: [
                 { enemies: { slow_boss_cube_hard: 3 }, spawnInterval: 1000, waitAfter: 1000 },
-                { enemies: { crystal_boss_cube_hard: 3 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { crystal_boss_cube_hard: 3 }, spawnInterval: 1000, waitAfter: 500 },
+                { enemies: { rock_cube: 4 }, spawnInterval: 300, waitAfter: 0 },
+
             ],
             endWaitTime: 18000
         },
@@ -332,16 +338,20 @@ function generateHardWaves() {
         {
             groups: [
                 { enemies: { gargantuar_x: 6 }, spawnInterval: 1000, waitAfter: 1000 },
-                { enemies: { guardian_cube_2: 2 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { rock_cube_small: 15 }, spawnInterval: 100, waitAfter: 2000 },
+                { enemies: { rock_cube: 5 }, spawnInterval: 200, waitAfter: 5000 },
+                { enemies: { guardian_cube_2: 1 }, spawnInterval: 1000, waitAfter: 0 }
             ],
-            endWaitTime: 18000
+            endWaitTime: 45000
         },
         // Wave 40 - Final Boss
         {
             groups: [
-                { enemies: { zeltron_cube: 1 }, spawnInterval: 1000, waitAfter: 0 }
+                { enemies: { zeltron_cube: 1 }, spawnInterval: 1000, waitAfter: 5000 },
+                { enemies: { guardian_cube_2: 2 }, spawnInterval: 500, waitAfter: 2000 },
+                { enemies: { crystalized_titan_cube: 1 }, spawnInterval: 1000, waitAfter: 0 }
             ],
-            endWaitTime: 20000
+            endWaitTime: 100000
         }
     );
 

@@ -348,6 +348,7 @@ class CommandTerminal {
 
             parsedArgs.push(convertedValue);
         }
+
 
         return {
             command: command,
@@ -466,7 +467,6 @@ class CommandTerminal {
             }
             return { hint: '', fullSignature: '', suggestions: [] };
         }
-
         // Handle entity type auto-complete for Spawn command
         if (commandName === 'spawn' && tokens.length >= 1) {
             const searchTerm = tokens.length > 1 ? tokens[1] : '';
@@ -561,6 +561,7 @@ class CommandTerminal {
 
         this.inputElement.addEventListener('keydown', (e) => {
             // Handle Tab key for auto-completion
+
             if (e.key === 'Tab') {
                 e.preventDefault();
                 if (this.currentSuggestions.length > 0) {

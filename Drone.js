@@ -13,29 +13,29 @@ const DRONE_TOWER_TYPE = {
     levels: [
         {
             name: 'Placement',
-            description: 'Unlocks Minigun. Passive: every 2 reloads gain +5% dmg buff for 4s.',
+            description: 'Unlocks Minigun. Passive: every 2 reloads gain +10% dmg buff for 5s.',
             minigunDamage: 10,
             minigunFireRate: 200,
             minigunAmmo: 25,
             minigunReloadTime: 3000,
-            dmgBuffAmount: 0.05,
-            dmgBuffDuration: 4000,
+            dmgBuffAmount: 0.10,
+            dmgBuffDuration: 5000,
             upgradeCost: 2000
         },
         {
             name: 'Upgrade 1',
-            description: 'Better Minigun. Passive: +7% dmg buff for 5s.',
+            description: 'Better Minigun. Passive: +15% dmg buff for 6s.',
             minigunDamage: 25,
             minigunFireRate: 150,
             minigunAmmo: 35,
             minigunReloadTime: 3000,
-            dmgBuffAmount: 0.07,
-            dmgBuffDuration: 5000,
+            dmgBuffAmount: 0.15,
+            dmgBuffDuration: 6000,
             upgradeCost: 6000
         },
         {
             name: 'Upgrade 2',
-            description: 'Unlocks Rockets. Passive: +10% dmg buff for 7s.',
+            description: 'Unlocks Rockets. Passive: +20% dmg buff for 8s.',
             minigunDamage: 50,
             minigunFireRate: 100,
             minigunAmmo: 75,
@@ -45,8 +45,8 @@ const DRONE_TOWER_TYPE = {
             rocketFireRate: 400,
             rocketAmmo: 12, // "2- rockets 12 ammo reload takes 15s"
             rocketReloadTime: 10000,
-            dmgBuffAmount: 0.10,
-            dmgBuffDuration: 7000,
+            dmgBuffAmount: 0.20,
+            dmgBuffDuration: 8000,
             upgradeCost: 14000
         },
         {
@@ -67,7 +67,7 @@ const DRONE_TOWER_TYPE = {
             laserCooldown: 45000,
             sightBuffAmount: 0.20, // fixed resistance reduction basically
             sightCooldown: 30000,
-            dmgBuffAmount: 0.15,
+            dmgBuffAmount: 0.25,
             dmgBuffDuration: 10000,
             killBuffAmount: 0.60,
             killBuffDuration: 7000,
@@ -209,7 +209,7 @@ function updateDroneUnits() {
 
                             // Passive kill check
                             const startHp = enemy.hp;
-                            if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing');
+                            if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing', null, { fireRate: levelData.minigunFireRate });
 
                             if (enemy.hp <= 0 && startHp > 0) {
                                 if (enemy.isDroneBounty) {
@@ -266,7 +266,7 @@ function updateDroneUnits() {
 
                             // Passive kill check
                             const startHp = enemy.hp;
-                            if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing');
+                            if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing', null, { fireRate: levelData.rocketFireRate });
 
                             if (enemy.hp <= 0 && startHp > 0) {
                                 if (enemy.isDroneBounty) {
@@ -336,7 +336,7 @@ function updateDroneUnits() {
                                 const dmg = levelData.laserDamage * enemyDmgMult;
 
                                 const startHp = enemy.hp;
-                                if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing');
+                                if (typeof applyDamage === 'function') applyDamage(enemy, dmg, 'piercing', null, { fireRate: levelData.laserTickRate });
 
                                 if (enemy.hp <= 0 && startHp > 0) {
                                     if (enemy.isDroneBounty) {

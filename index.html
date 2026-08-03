@@ -104,6 +104,7 @@
                 <div class="tower-icon">🔫</div>
                 <div class="tower-name">Gunner</div>
                 <div class="tower-cost">$100</div>
+                <button id="goldenGunnerBtn" class="tower-variant-btn" type="button">Golden $750</button>
                 <div class="tower-hotkey">[1]</div>
             </div>
             <div class="tower-card" id="operatorBtn" data-hotkey="Q">
@@ -124,10 +125,23 @@
                 <div class="tower-cost">$350</div>
                 <div class="tower-hotkey">[3]</div>
             </div>
+            <div class="tower-card" id="tankHunterBtn" data-hotkey="U">
+                <div class="tower-icon" style="color:#F2B84B;">TH</div>
+                <div class="tower-name">Tank Hunter</div>
+                <div class="tower-cost">$5000</div>
+                <div class="tower-hotkey">[U]</div>
+            </div>
+            <div class="tower-card" id="bouncerBtn" data-hotkey="I">
+                <div class="tower-icon" style="color:#FFD166;">B</div>
+                <div class="tower-name">Bouncer</div>
+                <div class="tower-cost">$1200</div>
+                <div class="tower-hotkey">[I]</div>
+            </div>
             <div class="tower-card" id="raygunnerBtn" data-hotkey="4">
                 <div class="tower-icon">⚡</div>
                 <div class="tower-name">Raygunner</div>
                 <div class="tower-cost">$2000</div>
+                <button id="goldenRaygunnerBtn" class="tower-variant-btn" type="button">Golden $5000</button>
                 <div class="tower-hotkey">[4]</div>
             </div>
             <div class="tower-card" id="railgunnerBtn" data-hotkey="5">
@@ -140,6 +154,12 @@
                 <div class="tower-icon">🧙</div>
                 <div class="tower-name">Summoner</div>
                 <div class="tower-cost">$6000</div>
+                <div class="tower-hotkey">[6]</div>
+            </div>
+            <div class="tower-card" id="cubeBarracksBtn" data-hotkey="6">
+                <div class="tower-icon">CB</div>
+                <div class="tower-name">Cube Barracks</div>
+                <div class="tower-cost">$850</div>
                 <div class="tower-hotkey">[6]</div>
             </div>
             <div class="tower-card" id="farmBtn" data-hotkey="7">
@@ -178,6 +198,22 @@
                 <div class="tower-cost">$50000</div>
                 <div class="tower-hotkey">[C]</div>
             </div>
+            <div class="tower-card" id="goldenFactoryBtn" data-hotkey="G">
+                <div class="tower-icon" style="color:#F0DE14;">🏭</div>
+                <div class="tower-name">Golden Factory</div>
+                <div class="tower-cost">$600000</div>
+                <div class="tower-hotkey">[G]</div>
+            </div>            <div class="tower-card" id="compounderBtn" data-hotkey="Y">
+                <div class="tower-icon" style="color:#B87333;">⚗</div>
+                <div class="tower-name">Compounder</div>
+                <div class="tower-cost">$7000</div>
+                <div class="tower-hotkey">[Y]</div>
+            </div>            <div class="tower-card" id="mothFactoryBtn" data-hotkey="F">
+                <div class="tower-icon">M</div>
+                <div class="tower-name">Moth Factory</div>
+                <div class="tower-cost">$20000</div>
+                <div class="tower-hotkey">[F]</div>
+            </div>
             <div class="tower-card" id="chargerBtn" data-hotkey="Z">
                 <div class="tower-icon">⚡</div>
                 <div class="tower-name">Charger</div>
@@ -188,6 +224,7 @@
                 <div class="tower-icon">📦</div>
                 <div class="tower-name">Carrier Cube</div>
                 <div class="tower-cost">$200000</div>
+                <button id="goldenCarrierBtn" class="tower-variant-btn" type="button">Golden $750000</button>
                 <div class="tower-hotkey">[X]</div>
             </div>
             <div class="tower-card" id="droneBtn" data-hotkey="V">
@@ -200,12 +237,20 @@
                 <div class="tower-icon">🔫</div>
                 <div class="tower-name">Mafia</div>
                 <div class="tower-cost">$500</div>
+                <button id="goldenMafiaBtn" class="tower-variant-btn" type="button">Golden $1500</button>
+
                 <div class="tower-hotkey">[M]</div>
             </div>
             <div class="tower-card" id="cbaseBtn" data-hotkey="B">
                 <div class="tower-icon">🏰</div>
                 <div class="tower-name">C-Base</div>
                 <div class="tower-cost">$100000</div>
+                <div class="tower-hotkey">[B]</div>
+            </div>
+            <div class="tower-card" id="cubeBaseBtn" data-hotkey="B">
+                <div class="tower-icon">CB</div>
+                <div class="tower-name">Cube Base</div>
+                <div class="tower-cost">$10000</div>
                 <div class="tower-hotkey">[B]</div>
             </div>
             <div class="tower-card" id="commandoBtn" data-hotkey="N">
@@ -219,6 +264,18 @@
                 <div class="tower-name">Lunar Cube</div>
                 <div class="tower-cost">$10000</div>
                 <div class="tower-hotkey">[L]</div>
+            </div>
+            <div class="tower-card" id="eclipseWeaverBtn" data-hotkey="J">
+                <div class="tower-icon" style="color:#6A0DAD;">🌀</div>
+                <div class="tower-name">Eclipse Weaver</div>
+                <div class="tower-cost">$3000</div>
+                <div class="tower-hotkey">[J]</div>
+            </div>
+            <div class="tower-card" id="blockpireBtn" data-hotkey="K">
+                <div class="tower-icon" style="color:#DC143C;">💎</div>
+                <div class="tower-name">Blockpire</div>
+                <div class="tower-cost">$3000</div>
+                <div class="tower-hotkey">[K]</div>
             </div>
             <!-- Gunner Paragon is an upgrade, not a placeable tower -->
         </div>
@@ -266,6 +323,11 @@
                 <button id="freeUpgradesBtn" class="cheat-btn">🆓 Free Upgrades</button>
                 <button id="speedUpBtn" class="cheat-btn">⚡ Speed x1</button>
                 <button id="spawnDummyBtn" class="cheat-btn">🎯 Spawn Test Dummy</button>
+                <button id="legacySpawnersBtn" class="cheat-btn">LEGACY: OFF</button>
+                <button id="cosmicGodTowerBtn" class="cheat-btn cosmic-god-cheat" type="button">
+                    <img src="outerspace-58.gif" alt="">
+                    <span>Cosmic GOD Tower</span>
+                </button>
             </div>
             <div class="cheat-input-section">
                 <label>Set Wave Number:</label>
@@ -308,9 +370,14 @@
     <!-- Load wave aggregator -->
     <script src="waves.js"></script>
     <script src="carrierCube.js"></script>
+    <script src="goldenCarrier.js"></script>
     <script src="Drone.js"></script>
     <script src="Mafia.js"></script>
+    <script src="goldenMafia.js"></script>
+    <script src="Compounder.js"></script>
     <script src="CBase.js"></script>
+    <script src="EclipseWeaver.js"></script>
+    <script src="Blockpire.js"></script>
     <script src="towers.js"></script>
 
     <!-- Load command terminal system -->

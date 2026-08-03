@@ -59,7 +59,7 @@ const CBASE_CASTER = {
     grenadeAOERadius: 1,
     grenadeCooldown: 4000,
     grenadeArmadaGain: 2,
-    selfDestructDamage: 500,
+    selfDestructDamage: 1500,
     potencyPerHit: 0
 };
 
@@ -82,7 +82,7 @@ const CBASE_OPPRESSOR = {
     laserRange: 12,
     piercingDamage: 1400,
     piercingArmadaGain: 1,
-    selfDestructDamage: 500,
+    selfDestructDamage: 1500,
     potencyPerHit: 0
 };
 
@@ -98,14 +98,14 @@ const CBASE_IMPALER = {
     isCBaseSummon: true,
     cbaseUnitType: 'IMPALER',
     armadaCapacity: 5,
-    impaleDamage: 1500,
+    impaleDamage: 2000,
     impaleInterval: 500,
     impaleRange: 4,
     selfDestructDamage: 15000,
     selfDestructRange: 4,
     selfDestructArmadaGain: 4,
-    collisionBurstMinDamage: 2000,
-    collisionBurstMaxDamage: 2500,
+    collisionBurstMinDamage: 5000,
+    collisionBurstMaxDamage: 7500,
     collisionBurstRange: 2,
     armadaHitsRequired: 4,
     armadaGainPerCycle: 2,
@@ -173,7 +173,7 @@ const CBASE_EXECUTIONER = {
     bombSplashDamage: 5000,
     bombAOERadius: 2,
     bombCooldown: 12000,
-    selfDestructDamage: 5000,
+    selfDestructDamage: 10000,
     potencyPerHit: 0
 };
 
@@ -207,14 +207,17 @@ const CBASE_CRUSADER = {
     omegaExplosionBaseDamage: 50000,
     omegaExplosionMaxHpPct: 0.01,
     omegaExplosionRange: 6,
-    omegaExplosionKnockback: 8,
+    omegaExplosionKnockback: 5,
     omegaExplosionCooldown: 140000,
     burstLaserDamage: 600,
     burstLaserTickRate: 50,
     burstLaserCount: 50,
     burstLaserCooldown: 15000,
     burstLaserArmadaCost: 4,
-    selfDestructDamage: 10000,
+    selfDestructDamage: 25000,
+    collisionBurstMinDamage: 5000,
+    collisionBurstMaxDamage: 10000,
+    collisionBurstRange: 3,
     potencyPerHit: 0
 };
 
@@ -660,7 +663,7 @@ function update_cbase_oppressor(unit, timestamp) {
         if (timestamp - unit.laserStartTime < unit.type.laserDuration) {
             unit.isStopped = true;
             if (target && timestamp - unit.lastLaserTick >= unit.type.laserTickRate) {
-                applyDamage(target, cbase_effective_damage(unit, unit.type.laserDamage, timestamp), 'laser', 'summonerRange');
+                applyDamage(target, cbase_effective_damage(unit, unit.type.laserDamage, timestamp), 'laser', 'summonerRange', { fireRate: unit.type.laserTickRate });
                 projectiles.push({ x1: unit.x, y1: unit.y, x2: target.x, y2: target.y, color: '#FF3300', width: 3, startTime: timestamp, duration: 60 });
                 unit.lastLaserTick = timestamp;
             }
@@ -783,7 +786,7 @@ function update_cbase_resonator(unit, timestamp) {
     if (timestamp - (unit.lastResonatorShot || 0) >= unit.type.fireRate) {
         const tickDamage = cbase_effective_damage(unit, unit.resonatorBeamDamage || unit.type.orbBeamDamage, timestamp);
         for (let i = 0; i < unit.type.orbCount; i++) {
-            applyDamage(target, tickDamage, 'laser', 'summonerRange');
+            applyDamage(target, tickDamage, 'laser', 'summonerRange', { fireRate: unit.type.fireRate });
         }
         unit.lastResonatorShot = timestamp;
     }
@@ -822,7 +825,7 @@ function update_cbase_executioner(unit, timestamp) {
         if (timestamp - unit.blasterStartTime < unit.type.blasterDuration) {
             const target = cbase_find_nearest_enemy(unit, Infinity);
             if (target && timestamp - unit.lastBlasterTick >= unit.type.blasterTickRate) {
-                applyDamage(target, cbase_effective_damage(unit, unit.type.blasterDamage, timestamp), 'laser', 'summonerRange');
+                applyDamage(target, cbase_effective_damage(unit, unit.type.blasterDamage, timestamp), 'laser', 'summonerRange', { fireRate: unit.type.blasterTickRate });
                 projectiles.push({ x1: unit.x, y1: unit.y, x2: target.x, y2: target.y, color: '#FF4400', width: 2, startTime: timestamp, duration: 50 });
                 unit.lastBlasterTick = timestamp;
             }
@@ -963,7 +966,7 @@ function update_cbase_crusader(unit, timestamp) {
         if ((unit.burstLaserShotsRemaining || 0) > 0 && timestamp - (unit.lastBurstLaserShot || 0) >= unit.type.burstLaserTickRate) {
             const target = cbase_find_nearest_enemy(unit, Infinity);
             if (target) {
-                applyDamage(target, cbase_effective_damage(unit, unit.type.burstLaserDamage, timestamp), 'laser', 'summonerRange');
+                applyDamage(target, cbase_effective_damage(unit, unit.type.burstLaserDamage, timestamp), 'laser', 'summonerRange', { fireRate: unit.type.burstLaserTickRate });
                 projectiles.push({ x1: unit.x, y1: unit.y, x2: target.x, y2: target.y, color: '#FF3355', width: 3, startTime: timestamp, duration: 60 });
             }
             unit.burstLaserShotsRemaining--;
