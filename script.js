@@ -8021,7 +8021,9 @@ function updateEnemies(timestamp) {
 
             // Step 4: Handle ram and removal if at start/end of path
             handleRam(entity, i);
-            if (entity.distanceTraveled <= 0) enemies.splice(i, 1);
+            if (enemies.includes(entity) && entity.distanceTraveled <= 0) {
+                enemies.splice(enemies.indexOf(entity), 1);
+            }
         }
         // END OF REPLACED BLOCK
         else {
@@ -8860,54 +8862,55 @@ function applySquareDamageAt(x, y, sizeTiles, damage, damageType = 'explosive', 
 }
 
 
-function getSummonDurability(summon) {
-    const hpColRes = summon.type.resistances && summon.type.resistances.summonerCollision !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollision))
-        : 0;
-    const shieldColRes = summon.type.resistances && summon.type.resistances.summonerCollisionShield !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollisionShield))
-        : hpColRes;
-    const hpLimit = hpColRes >= 1 ? Infinity : (Math.max(0, summon.hp || 0) / (1 - hpColRes));
-    const shieldLimit = shieldColRes >= 1 ? Infinity : (Math.max(0, summon.shield || 0) / (1 - shieldColRes));
-    return hpLimit + shieldLimit;
+function getCollisionResistance(entity, forShield = false) {
+    const resistances = entity?.type?.resistances || entity?.resistance || {};
+    const shieldValue = resistances.summonerCollisionShield;
+    const baseValue = resistances.summonerCollision;
+    const value = forShield && shieldValue !== undefined ? shieldValue : (baseValue ?? 0);
+    return Math.max(0, Math.min(1, value));
 }
 
-function getSummonMaxIncomingDamageAllowed(summon) {
-    const hpColRes = summon.type.resistances && summon.type.resistances.summonerCollision !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollision))
-        : 0;
-    const shieldColRes = summon.type.resistances && summon.type.resistances.summonerCollisionShield !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollisionShield))
-        : hpColRes;
+function getCollisionLayerResult(attacker, defender) {
+    let remainingAttackerHp = Math.max(0, attacker?.hp || 0);
+    const attackerResistance = getCollisionResistance(attacker);
+    const defenderShieldResistance = getCollisionResistance(defender, true);
+    const defenderBaseResistance = getCollisionResistance(defender, false);
+    const ignoresResistance = attacker?.type?.ignoreCollisionResistance === true;
 
-    const rawShieldLimit = shieldColRes >= 1 ? Infinity : (Math.max(0, summon.shield || 0) / (1 - shieldColRes));
-    const rawHpLimit = hpColRes >= 1 ? Infinity : (Math.max(0, summon.hp || 0) / (1 - hpColRes));
-    return rawShieldLimit + rawHpLimit;
-}
+    const shieldGap = ignoresResistance ? 0 : Math.abs(attackerResistance - defenderShieldResistance);
+    const shieldMultiplier = Math.max(0.0001, 1 - shieldGap);
+    const defenderShield = Math.max(0, defender?.shield || 0);
+    let shieldDamage = 0;
 
-function applyCollisionDamageToSummon(summon, rawDamage) {
-    const hpColRes = summon.type.resistances && summon.type.resistances.summonerCollision !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollision))
-        : 0;
-    const shieldColRes = summon.type.resistances && summon.type.resistances.summonerCollisionShield !== undefined
-        ? Math.max(0, Math.min(1, summon.type.resistances.summonerCollisionShield))
-        : hpColRes;
-
-    let remainingDamage = rawDamage;
-    if ((summon.hasShield || summon.type.hasShield) && summon.shield > 0) {
-        const scaledShieldColDmg = remainingDamage * (1 - shieldColRes);
-        const shieldDamage = Math.min(summon.shield, scaledShieldColDmg);
-        summon.shield -= shieldDamage;
-
-        const rawUsed = shieldColRes >= 1 ? 0 : shieldDamage / (1 - shieldColRes);
-        remainingDamage = Math.max(0, remainingDamage - rawUsed);
+    if (defenderShield > 0 && remainingAttackerHp > 0) {
+        const attackerHpNeededForShield = defenderShield / shieldMultiplier;
+        const attackerHpSpentOnShield = Math.min(remainingAttackerHp, attackerHpNeededForShield);
+        shieldDamage = attackerHpSpentOnShield * shieldMultiplier;
+        remainingAttackerHp -= attackerHpSpentOnShield;
     }
 
-    if (remainingDamage > 0) {
-        summon.hp -= remainingDamage * (1 - hpColRes);
+    const baseGap = ignoresResistance ? 0 : Math.abs(attackerResistance - defenderBaseResistance);
+    const baseMultiplier = Math.max(0.0001, 1 - baseGap);
+    const baseDamage = remainingAttackerHp > 0 ? remainingAttackerHp / baseMultiplier : 0;
+
+    return { shieldDamage, baseDamage };
+}
+
+function applyCollisionLayerResult(defender, result) {
+    if (!defender || !result) return;
+    if ((defender.hasShield || defender.type?.hasShield) && defender.shield > 0 && result.shieldDamage > 0) {
+        defender.shield = Math.max(0, defender.shield - result.shieldDamage);
+    }
+    if (result.baseDamage > 0) {
+        defender.hp -= result.baseDamage;
     }
 }
 
+function collisionResultKills(defender, result) {
+    if (!defender || !result) return false;
+    const shieldAfter = ((defender.hasShield || defender.type?.hasShield) ? Math.max(0, defender.shield || 0) - result.shieldDamage : 0);
+    return shieldAfter <= 0 && (defender.hp || 0) - result.baseDamage <= 0;
+}
 function tryCubotKnockbackOnRam(summon, enemy, timestamp) {
     if (!summon.type.cubotKnockbackDamage || !enemy || enemy.isSummon) return false;
     const enemyTotalHp = (enemy.hp || 0) + (enemy.shield || 0);
@@ -8930,55 +8933,49 @@ function handleRam(summon, summonIndex) {
     for (let i = enemies.length - 1; i >= 0 && !ramOccurred; i--) {
         const enemy = enemies[i];
         if (!enemy || enemy === summon) continue;
-        if (!enemy.isSummon && calculateDistance(summon.x, summon.y, enemy.x, enemy.y) < (summon.size + enemy.size) / 2) {
-            const baseIncomingDamage = getSummonDurability(summon);
-            // Golden Destructor collisions scale from the enemy that hit it. The old
-            // rule used the Destructor's full HP as collision damage, making every
-            // collision an automatic mutual one-shot.
-            const incomingDamage = summon.type.ignoreCollisionResistance
-                ? Math.min(baseIncomingDamage, Math.max(0, enemy.hp || 0))
-                : baseIncomingDamage;
-            const wouldDie = incomingDamage >= getSummonMaxIncomingDamageAllowed(summon);
-            if (wouldDie && tryCubotKnockbackOnRam(summon, enemy, performance.now())) {
+        if (enemy.isSummon || calculateDistance(summon.x, summon.y, enemy.x, enemy.y) >= (summon.size + enemy.size) / 2) continue;
+
+        // Calculate both directions before changing either unit. The enemy's
+        // current HP is the collision damage budget; the defender's shield phase
+        // consumes that budget first, then only the remaining HP reaches Base HP.
+        const damageToEnemy = getCollisionLayerResult(summon, enemy);
+        const damageToSummon = getCollisionLayerResult(enemy, summon);
+        const summonWouldDie = collisionResultKills(summon, damageToSummon);
+
+        if (summonWouldDie && tryCubotKnockbackOnRam(summon, enemy, performance.now())) {
+            ramOccurred = true;
+            continue;
+        }
+
+        applyCollisionLayerResult(enemy, damageToEnemy);
+        applyCollisionLayerResult(summon, damageToSummon);
+
+        if (summon.hp <= 0) {
+            triggerSummonRamExplosion(summon, performance.now());
+            if (summon.isCBaseSummon && typeof cbase_try_trigger_omega_explosion === 'function' && cbase_try_trigger_omega_explosion(summon, performance.now())) {
                 ramOccurred = true;
                 continue;
             }
-
-            const collisionDamage = incomingDamage;
-            applyCollisionDamageToSummon(summon, incomingDamage);
-            const ramDamageOptions = summon.type.ignoreCollisionResistance
-                ? { bypassResistances: true }
-                : { bypassGlobal: true, bypassDamageTypeResistances: true, summonerCollisionOverride: summon.type.resistances?.summonerCollision || 0 };
-            applyDamage(enemy, collisionDamage, 'bullet', 'summonerCollision', ramDamageOptions);
-            if (summon.type.isMothMammoth && summon.type.mammothCollisionDamage && summon.type.mammothCollisionAoETiles) {
-                applySquareDamageAt(summon.x, summon.y, summon.type.mammothCollisionAoETiles, summon.type.mammothCollisionDamage, 'explosive');
+            if (summon.isCBaseSummon && typeof cbase_on_unit_death === 'function') {
+                cbase_on_unit_death(summon, performance.now(), enemy);
             }
-            if (summon.hp <= 0) {
-                triggerSummonRamExplosion(summon, performance.now());
-                if (summon.isCBaseSummon && typeof cbase_try_trigger_omega_explosion === 'function' && cbase_try_trigger_omega_explosion(summon, performance.now())) {
-                    ramOccurred = true;
-                    continue;
-                }
-                // C-Base unit death hook
-                if (summon.isCBaseSummon && typeof cbase_on_unit_death === 'function') {
-                    cbase_on_unit_death(summon, performance.now(), enemy);
-                }
-                enemies.splice(summonIndex, 1);
-            }
-            if (enemy.hp <= 0) {
-                if (!enemy.isSummon && typeof triggerCompounderDeathEffects === 'function') {
-                    triggerCompounderDeathEffects(enemy, performance.now());
-                }
-                if (!enemy.isSummon && typeof cbase_on_marked_enemy_death === 'function') {
-                    cbase_on_marked_enemy_death(enemy, performance.now());
-                }
-                enemies.splice(i, 1);
-            }
-            ramOccurred = true;
+            const summonIndexNow = enemies.indexOf(summon);
+            if (summonIndexNow >= 0) enemies.splice(summonIndexNow, 1);
         }
+        if (enemy.hp <= 0) {
+            if (!enemy.isSummon && typeof triggerCompounderDeathEffects === 'function') {
+                triggerCompounderDeathEffects(enemy, performance.now());
+            }
+            if (!enemy.isSummon && typeof cbase_on_marked_enemy_death === 'function') {
+                cbase_on_marked_enemy_death(enemy, performance.now());
+            }
+            const enemyIndexNow = enemies.indexOf(enemy);
+            if (enemyIndexNow >= 0) enemies.splice(enemyIndexNow, 1);
+        }
+        updateCashDisplay();
+        ramOccurred = true;
     }
 }
-
 // Update explosions
 function updateExplosions(timestamp) {
     for (let i = explosions.length - 1; i >= 0; i--) {
