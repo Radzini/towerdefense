@@ -56,6 +56,7 @@ const towerButtons = {
     carrierCube: document.getElementById('carrierCubeBtn'),
     goldenCarrier: document.getElementById('goldenCarrierBtn'),
     drone: document.getElementById('droneBtn'),
+    iceMortar: document.getElementById('iceMortarBtn'),
     mafia: document.getElementById('mafiaBtn'),
     goldenMafia: document.getElementById('goldenMafiaBtn'),
     cbase: document.getElementById('cbaseBtn'),
@@ -696,6 +697,11 @@ function createTowerInstance(gridX, gridY, towerType, level = 1) {
 }
 
 function refreshCanvasCursor(isHoveringInteractive = false) {
+    if (window.iceMortarTargetingTower) {
+        const cursorIcon = window.iceMortarTargetingTower.iceMortarFrostlockReady ? 'frostlock.png' : 'iceshard.png';
+        canvas.style.cursor = `url("${cursorIcon}") 16 16, crosshair`;
+        return;
+    }
     const compounderTargeting = window.compounderTargeting;
     if (compounderTargeting) {
         const flask = window.COMPOUNDER_FLASKS?.[compounderTargeting.key];
@@ -879,6 +885,7 @@ function setupEventListeners() {
     towerButtons.carrierCube.addEventListener('click', () => selectTowerType(TOWER_TYPES.CARRIER_CUBE));
     if (towerButtons.goldenCarrier) towerButtons.goldenCarrier.addEventListener('click', (e) => { e.stopPropagation(); selectTowerType(TOWER_TYPES.GOLDEN_CARRIER); });
     if (towerButtons.drone) towerButtons.drone.addEventListener('click', () => selectTowerType(TOWER_TYPES.DRONE));
+    if (towerButtons.iceMortar) towerButtons.iceMortar.addEventListener('click', () => selectTowerType(TOWER_TYPES.ICE_MORTAR));
     if (towerButtons.mafia) towerButtons.mafia.addEventListener('click', () => selectTowerType(TOWER_TYPES.MAFIA));
     if (towerButtons.goldenMafia) towerButtons.goldenMafia.addEventListener('click', (e) => { e.stopPropagation(); selectTowerType(TOWER_TYPES.GOLDEN_MAFIA); });
     if (towerButtons.cbase) towerButtons.cbase.addEventListener('click', () => selectTowerType(TOWER_TYPES.CBASE));
@@ -965,6 +972,8 @@ function setupEventListeners() {
                 triggerRocketerParagonCluster(tower);
             } else if (tower.type === TOWER_TYPES.COMMANDO) {
                 triggerGoldenCommando(tower);
+            } else if (tower.type === TOWER_TYPES.ICE_MORTAR) {
+                beginIceMortarTargeting(tower);
             }
         }
     });
@@ -1105,9 +1114,18 @@ function setupEventListeners() {
                 return; // Prevent normal tower selection
             }
         }
+        if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.ICE_MORTAR && e.key === '1') {
+            e.preventDefault();
+            return;
+        }
 
         // ESC key to cancel placement or close tower panel
         if (e.key === 'Escape') {
+            if (window.iceMortarTargetingTower) {
+                cancelIceMortarTargeting();
+                if (currentInfoTower && towers.includes(currentInfoTower)) showTowerInfo(currentInfoTower);
+                return;
+            }
             if (window.compounderTargeting) window.compounderTargeting = null;
             if (selectedTower) {
                 selectedTower = null;
@@ -1192,6 +1210,8 @@ function setupEventListeners() {
             selectTowerType(TOWER_TYPES.CARRIER_CUBE);
         } else if (e.key === 'v' || e.key === 'V') {
             selectTowerType(TOWER_TYPES.DRONE);
+        } else if (e.key === 'y' || e.key === 'Y') {
+            selectTowerType(TOWER_TYPES.ICE_MORTAR);
         } else if (e.key === 'm' || e.key === 'M') {
             selectTowerType(TOWER_TYPES.MAFIA);
         } else if (e.key === 'b' || e.key === 'B') {
@@ -1300,6 +1320,7 @@ function updateTowerButtonCosts() {
     document.querySelector('#carrierCubeBtn .tower-cost').textContent = '$' + TOWER_TYPES.CARRIER_CUBE.cost;
     if (document.querySelector('#goldenCarrierBtn')) document.querySelector('#goldenCarrierBtn').textContent = 'Golden $' + TOWER_TYPES.GOLDEN_CARRIER.cost;
     if (document.querySelector('#droneBtn .tower-cost')) document.querySelector('#droneBtn .tower-cost').textContent = '$' + TOWER_TYPES.DRONE.cost;
+    if (document.querySelector('#iceMortarBtn .tower-cost')) document.querySelector('#iceMortarBtn .tower-cost').textContent = '$' + TOWER_TYPES.ICE_MORTAR.cost;
     if (document.querySelector('#mafiaBtn .tower-cost')) document.querySelector('#mafiaBtn .tower-cost').textContent = '$' + TOWER_TYPES.MAFIA.cost;
     if (document.querySelector('#goldenMafiaBtn')) document.querySelector('#goldenMafiaBtn').textContent = 'Golden $' + TOWER_TYPES.GOLDEN_MAFIA.cost;
     if (document.querySelector('#cbaseBtn .tower-cost')) document.querySelector('#cbaseBtn .tower-cost').textContent = '$' + TOWER_TYPES.CBASE.cost;
@@ -1339,6 +1360,7 @@ function updateTowerSelection() {
             [TOWER_TYPES.CARRIER_CUBE, towerButtons.carrierCube],
             [TOWER_TYPES.GOLDEN_CARRIER, towerButtons.goldenCarrier],
             [TOWER_TYPES.DRONE, towerButtons.drone],
+            [TOWER_TYPES.ICE_MORTAR, towerButtons.iceMortar],
             [TOWER_TYPES.MAFIA, towerButtons.mafia],
             [TOWER_TYPES.GOLDEN_MAFIA, towerButtons.goldenMafia],
             [TOWER_TYPES.CBASE, towerButtons.cbase],
@@ -1565,6 +1587,13 @@ function handleCanvasClick(event) {
     const mouseY = event.clientY - rect.top;
     const gridX = Math.floor(mouseX / GRID_SIZE);
     const gridY = Math.floor(mouseY / GRID_SIZE);
+
+    if (window.iceMortarTargetingTower) {
+        const mortar = window.iceMortarTargetingTower;
+        cancelIceMortarTargeting();
+        fireIceMortar(mortar, mouseX, mouseY);
+        return;
+    }
 
     if (typeof handleCompounderTargetingClick === "function" && handleCompounderTargetingClick(mouseX, mouseY)) return;
 
@@ -1806,11 +1835,17 @@ function getEntityStatusEffects(entity, now = performance.now()) {
     if ((entity.commandoStunUntil || 0) > now) {
         statusEffects.push(`Commando Stun ${formatSeconds(entity.commandoStunUntil - now)}`);
     }
+    if ((entity.iceMortarStunUntil || 0) > now) {
+        statusEffects.push(`Ice Mortar Stun ${formatSeconds(entity.iceMortarStunUntil - now)}`);
+    }
     if ((entity.agentStunUntil || 0) > now) {
         statusEffects.push(`Agent Stun ${formatSeconds(entity.agentStunUntil - now)}`);
     }
     if ((entity.commandoSlowUntil || 0) > now && entity.commandoSlowAmount) {
         statusEffects.push(`Commando Slow ${Math.round((entity.commandoSlowAmount || 0) * 100)}% ${formatSeconds(entity.commandoSlowUntil - now)}`);
+    }
+    if ((entity.iceMortarSlowUntil || 0) > now && entity.iceMortarSlowAmount) {
+        statusEffects.push(`Ice Mortar Slow ${Math.round(entity.iceMortarSlowAmount * 100)}% ${formatSeconds(entity.iceMortarSlowUntil - now)}`);
     }
     if (entity.agentSlowEffects?.length) {
         const activeAgentSlows = entity.agentSlowEffects.filter(effect => effect.until > now);
@@ -2116,6 +2151,7 @@ function showTowerInfo(tower) {
     lastTowerInfoUpdate = performance.now();
 
     abilityTowerBtn.style.display = 'none';
+    abilityTowerBtn.classList.remove('ice-mortar-shoot-btn');
     ability2TowerBtn.style.display = 'none';
     const mafiaTrapsBtn = document.getElementById('mafiaTrapsBtn');
     if (mafiaTrapsBtn) mafiaTrapsBtn.style.display = 'none';
@@ -2125,6 +2161,7 @@ function showTowerInfo(tower) {
     const level = tower.level;
     const type = tower.type;
     const currentStats = type.levels[level - 1];
+    if (type === TOWER_TYPES.ICE_MORTAR) updateIceMortarShootButton(tower);
     if (type.isCompounder && typeof ensureCompounderState === "function") ensureCompounderState(tower);
 
     // Build info HTML
@@ -2968,6 +3005,20 @@ function showTowerInfo(tower) {
                 Use W A S D to move the Drone
             </div>
         `;
+    } else if (type === TOWER_TYPES.ICE_MORTAR) {
+        const charge = tower.iceMortarCharge || 0;
+        const shardCount = tower.iceShardCount || 0;
+        const frostlockText = currentStats.frostlockLevel === 2
+            ? '−20% speed for 6s, 5s stun below 500k HP, 50,000 true damage in 3x3.'
+            : '−15% speed for 4s, 4s stun below 200k HP, 15,000 true damage in 3x3.';
+        infoHTML += `
+            <div class="info-row"><div class="info-label">Damage</div><div class="info-value">${currentStats.damage} Piercing in 3x3</div></div>
+            <div class="info-row"><div class="info-label">Range</div><div class="info-value">Infinite</div></div>
+            <div class="info-row"><div class="info-label">Cooldown</div><div class="info-value">${(currentStats.fireRate / 1000).toFixed(0)}s charge</div></div>
+            <div class="info-row"><div class="info-label">Shoot Progress</div><div class="info-value">${charge}/${currentStats.chargeRequirement}${tower.iceMortarProjectileActive ? ' — BALL IN FLIGHT' : charge >= currentStats.chargeRequirement ? ' — READY' : ''}</div></div>
+            <div class="info-row"><div class="info-label"><img src="iceshard.png" alt="Ice Shard" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:4px;">Ice Shards</div><div class="info-value">${shardCount}/${currentStats.shardRequirement || '—'}</div></div>
+            ${currentStats.frostlockLevel ? `<div class="info-row" title="${frostlockText}"><div class="info-label"><img src="frostlock.png" alt="Frostlock" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:4px;">Frostlock ${currentStats.frostlockLevel === 2 ? 'II' : 'I'}</div><div class="info-value">${frostlockText}</div></div>` : ''}
+        `;
     } else {
         // Get Commander buffs
         const buffs = getCommanderBuffs(tower);
@@ -3353,6 +3404,9 @@ function showTowerInfo(tower) {
         const bpTrapsBtn = document.getElementById('mafiaTrapsBtn');
         if (bpTrapsBtn) bpTrapsBtn.style.display = 'none';
         document.getElementById('carrierSpawnPanel').style.display = 'none';
+    } else if (type === TOWER_TYPES.ICE_MORTAR) {
+        updateIceMortarShootButton(tower);
+        ability2TowerBtn.style.display = 'none';
     } else if (type.isAgent) {
         abilityTowerBtn.style.display = 'none';
         ability2TowerBtn.style.display = 'none';
@@ -4097,6 +4151,11 @@ function initializeSpecialTowerState(tower) {
         tower.lunarCharging = tower.lunarCharging || false;
         tower.lunarChargeStart = tower.lunarChargeStart || 0;
         tower.lunarChargeTarget = tower.lunarChargeTarget || null;
+    } else if (tower.type === TOWER_TYPES.ICE_MORTAR) {
+        tower.iceMortarCharge = tower.iceMortarCharge || 0;
+        tower.iceMortarLastCharge = tower.iceMortarLastCharge || performance.now();
+        tower.iceShardCount = tower.iceShardCount || 0;
+        tower.iceMortarFrostlockReady = tower.iceMortarFrostlockReady || false;
     } else if (tower.type.isCubeBaseV2) {
         tower.cubeBaseUnitTiers = tower.cubeBaseUnitTiers || {
             BASE_GOLDEN_OPERATOR: 1,
@@ -4199,6 +4258,9 @@ function sellTower(tower) {
         farmCount--;
     } else if (tower.type === TOWER_TYPES.DRONE) {
         if (typeof clearDroneUnits === 'function') clearDroneUnits();
+    } else if (tower.type === TOWER_TYPES.ICE_MORTAR) {
+        tower.iceMortarCharge = 0;
+        tower.iceShardCount = 0;
     } else if (tower.type && tower.type.isCosmicGod) {
         if (typeof clearCosmicGodTowerEffects === 'function') clearCosmicGodTowerEffects(tower);
     }
@@ -5155,7 +5217,8 @@ window.spawnEntity = spawnEntity;
 window.path = path;
 
 function updateTowerInfoPeriodically(timestamp) {
-    if (currentInfoTower && towers.includes(currentInfoTower) && timestamp - lastTowerInfoUpdate > 1000) {
+    const infoRefreshRate = currentInfoTower?.type?.isIceMortar ? 200 : 1000;
+    if (currentInfoTower && towers.includes(currentInfoTower) && timestamp - lastTowerInfoUpdate > infoRefreshRate) {
         showTowerInfo(currentInfoTower);
         if (currentInfoTower.type.isCarrier) {
             showCarrierSpawnUI(currentInfoTower);
@@ -7336,6 +7399,8 @@ function updateTowers(timestamp) {
 
         } else if (tower.type === TOWER_TYPES.GOLDEN_CARRIER) {
             updateGoldenCarrierTower(tower, stats, timestamp);
+        } else if (tower.type === TOWER_TYPES.ICE_MORTAR) {
+            updateIceMortarTower(tower, stats, timestamp);
         } else if (tower.type === TOWER_TYPES.COMPOUNDER) {
             updateCompounderTower(tower, stats, timestamp);
         }
@@ -7757,6 +7822,17 @@ function drawTowers() {
                 ctx.restore();
             }
             ctx.shadowBlur = 0;
+        } else if (tower.type.isIceMortar) {
+            const mortarGradient = ctx.createLinearGradient(px, py, px + pw, py + ph);
+            mortarGradient.addColorStop(0, '#0B5D73');
+            mortarGradient.addColorStop(0.5, '#38D9E8');
+            mortarGradient.addColorStop(1, '#0B3448');
+            ctx.fillStyle = mortarGradient;
+            ctx.fillRect(px, py, pw, ph);
+            ctx.strokeStyle = '#BFFFFF';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px + 2, py + 2, pw - 4, ph - 4);
+            if (typeof drawIceMortarCharge === 'function') drawIceMortarCharge(ctx, tower);
         } else if (tower.type.isEclipseWeaver && eclipseWeaverTexture.complete && eclipseWeaverTexture.naturalWidth > 0) {
             ctx.drawImage(eclipseWeaverTexture, px, py, pw, ph);
         } else {
@@ -7892,7 +7968,11 @@ function updateWave(timestamp) {
 function updateProjectiles(timestamp) {
     projectiles = projectiles.filter(projectile => {
         const elapsed = timestamp - projectile.startTime;
-        return elapsed < projectile.duration;
+        if (elapsed >= projectile.duration) {
+            if (typeof projectile.onImpact === 'function') projectile.onImpact();
+            return false;
+        }
+        return true;
     });
 }
 
@@ -8151,11 +8231,14 @@ function updateEnemies(timestamp) {
             // ═══════════════════════════════════════════════════════════════
             const previousSpeed = entity.speed;
             let effectiveSpeed = previousSpeed;
-            if ((entity.commandoStunUntil || 0) > timestamp || (entity.agentStunUntil || 0) > timestamp) {
+            if ((entity.commandoStunUntil || 0) > timestamp || (entity.agentStunUntil || 0) > timestamp || (entity.iceMortarStunUntil || 0) > timestamp) {
                 effectiveSpeed = 0;
             } else {
                 if ((entity.commandoSlowUntil || 0) > timestamp) {
                     effectiveSpeed *= (1 - (entity.commandoSlowAmount || 0));
+                }
+                if ((entity.iceMortarSlowUntil || 0) > timestamp) {
+                    effectiveSpeed *= (1 - (entity.iceMortarSlowAmount || 0));
                 }
                 if ((entity.goldenMafiaSlowUntil || 0) > timestamp) {
                     effectiveSpeed *= (1 - (entity.goldenMafiaSlowAmount || 0));
@@ -9412,6 +9495,20 @@ function drawEntities() {
     // Draw projectiles
     for (const projectile of projectiles) {
         if (projectile.renderStyle === 'orb') continue;
+        if (projectile.renderStyle === 'ice-mortar') {
+            const progress = Math.max(0, Math.min(1, (performance.now() - projectile.startTime) / projectile.duration));
+            const ballX = projectile.x1 + (projectile.x2 - projectile.x1) * progress;
+            const ballY = projectile.y1 + (projectile.y2 - projectile.y1) * progress;
+            ctx.save();
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = '#38D9E8';
+            ctx.fillStyle = '#D8FFFF';
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, GRID_SIZE * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            continue;
+        }
         ctx.strokeStyle = projectile.color;
         ctx.lineWidth = projectile.width;
         ctx.beginPath();

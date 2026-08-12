@@ -667,6 +667,11 @@ const TOWER_TYPES = {
         levels: []
     },
 
+    ICE_MORTAR: typeof ICE_MORTAR_TOWER_TYPE !== 'undefined' ? ICE_MORTAR_TOWER_TYPE : {
+        name: 'Ice Mortar', color: '#38D9E8', cost: 3000, damageType: 'piercing', aoe: true,
+        summons: false, isIceMortar: true, cannotBeBuffed: true, limit: 2, size: 1, footprint: { width: 1, height: 1 }, levels: []
+    },
+
     MAFIA: typeof MAFIA_TOWER_TYPE !== 'undefined' ? MAFIA_TOWER_TYPE : {
         name: 'Mafia',
         color: '#1A1A1A',
