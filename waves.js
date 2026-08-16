@@ -58,11 +58,21 @@ if (typeof NIGHTMARE_WAVES === 'undefined') {
     }
 }
 
+// Ensure CHAOS_WAVES is defined
+if (typeof CHAOS_WAVES === 'undefined') {
+    if (typeof generateChaosWaves === 'function') {
+        window.CHAOS_WAVES = generateChaosWaves();
+    } else {
+        window.CHAOS_WAVES = [];
+    }
+}
+
 console.log("Wave definitions loaded:", {
     Normal: NORMAL_WAVES.length,
     Hard: HARDMODE_WAVES.length,
     Insane: INSANE_WAVES.length,
     BossRush: BOSSRUSH_WAVES.length,
     Nightmare: NIGHTMARE_WAVES.length,
+    Chaos: CHAOS_WAVES.length,
     Extra: EXTRA_WAVES.length
 });

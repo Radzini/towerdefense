@@ -96,6 +96,7 @@ class CommandTerminal {
                 'Spawn red_cube',
                 'Spawn PARAGON_ALPHA',
                 'Spawn boss_cube',
+                'Spawn rubik_cube_cm1',
                 'Spawn CBASE_EXECUTIONER'
             ],
             execute: (args) => {

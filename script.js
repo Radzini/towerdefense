@@ -94,6 +94,8 @@ let frameDelta = 16.667; // ms since last frame, init to 60fps
 // Preload Eclipse Weaver texture
 const eclipseWeaverTexture = new Image();
 eclipseWeaverTexture.src = 'cosmic-cloud-art-stockcake.png';
+const chaosGalaxyTexture = new Image();
+chaosGalaxyTexture.src = 'galaxy.png';
 
 // ===== SCREEN SHAKE =====
 let screenShake = { intensity: 0, duration: 0, startTime: -9999 };
@@ -366,6 +368,14 @@ const GAME_MODES = {
         cashMultiplier: 2.0,
         startingCash: 1500,
         bosses: []
+    },
+    CHAOS_PART1: {
+        name: "Chaos Mode",
+        waves: 45,
+        difficultyMultiplier: 3.0,
+        cashMultiplier: 2.0,
+        startingCash: 2000,
+        bosses: []
     }
 };
 
@@ -460,6 +470,8 @@ let orbitalStrikeData = null;
 let railgunShots = [];
 let mothFadingShots = [];
 let bouncerBalls = [];
+let chaosBouncerBalls = [];
+let chaosBeams = [];
 let currentInfoTower = null;
 let lastAbilityTime = 0;
 let lastOrbitalStrikeTime = 0; // Global cooldown for Orbital Strike
@@ -5044,6 +5056,17 @@ function spawnWave() {
             }
         }
         console.log("Nightmare Waves loaded:", currentWaves ? currentWaves.length : 0);
+    } else if (currentGameMode === GAME_MODES.CHAOS_PART1) {
+        if ((!window.CHAOS_WAVES || window.CHAOS_WAVES.length === 0) && typeof generateChaosWaves === 'function') {
+            console.log("Re-initializing Chaos waves...");
+            window.CHAOS_WAVES = generateChaosWaves();
+        }
+        currentWaves = window.CHAOS_WAVES || [];
+        console.log("Chaos Waves loaded:", currentWaves.length);
+        if (currentWaves.length === 0) {
+            console.error("Chaos Mode wave data is unavailable; refusing to generate fallback waves.");
+            return;
+        }
     } else {
         currentWaves = NORMAL_WAVES; // Fallback
     }
@@ -5288,10 +5311,12 @@ function gameLoop(timestamp) {
         updateCompounderEffects(timestamp);
         updateEnemies(timestamp);
         updateBouncerBalls(timestamp);
+        updateChaosBouncerBalls(timestamp);
         drawRocketerAcidPools(ctx, timestamp);
         drawCompounderEffects(ctx, timestamp);
         drawEnemyTowerAcidZones(ctx, timestamp);
         drawEntities();
+        drawChaosEnemyEffects(timestamp);
         drawCarrierUnits(ctx); // Draw Air Units
         if (typeof drawDrone === 'function') drawDrone(ctx);
         if (currentInfoTower && currentInfoTower.type === TOWER_TYPES.DRONE && typeof drawDroneCrosshair === 'function') {
@@ -6090,6 +6115,359 @@ function spawnEnemyAtDistance(enemyType, distanceTraveled, xOffset = 0, yOffset 
     return entity;
 }
 
+function getRandomTower() {
+    if (!towers.length) return null;
+    return towers[Math.floor(Math.random() * towers.length)] || null;
+}
+
+function getRandomDistinctTowers(count) {
+    const candidates = towers.filter(Boolean);
+    for (let index = candidates.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+    }
+    return candidates.slice(0, Math.max(0, Math.min(count, candidates.length)));
+}
+
+function getNearestPathDistanceToPoint(x, y) {
+    if (!path.length) return 0;
+    let nearestIndex = 0;
+    let nearestDistanceSq = Infinity;
+    for (let i = 0; i < path.length; i++) {
+        const distanceSq = calculateDistanceSq(x, y, path[i].x, path[i].y);
+        if (distanceSq < nearestDistanceSq) {
+            nearestDistanceSq = distanceSq;
+            nearestIndex = i;
+        }
+    }
+    return (nearestIndex / Math.max(1, path.length - 1)) * getPathLength();
+}
+
+function stunTowersAlongChaosBeam(entity, ability, timestamp) {
+    const target = getRandomTower();
+    if (!target) return;
+    const dx = target.x - entity.x;
+    const dy = target.y - entity.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const beamLength = (ability.lengthTiles || 100) * GRID_SIZE;
+    const endX = entity.x + dx / length * beamLength;
+    const endY = entity.y + dy / length * beamLength;
+    const beamWidth = Math.max(1, ability.widthTiles || 1) * GRID_SIZE / 2;
+    const lineLengthSq = Math.pow(endX - entity.x, 2) + Math.pow(endY - entity.y, 2);
+
+    for (const tower of towers) {
+        if (!tower) continue;
+        const progress = Math.max(0, Math.min(1, ((tower.x - entity.x) * (endX - entity.x) + (tower.y - entity.y) * (endY - entity.y)) / lineLengthSq));
+        const closestX = entity.x + (endX - entity.x) * progress;
+        const closestY = entity.y + (endY - entity.y) * progress;
+        if (calculateDistance(tower.x, tower.y, closestX, closestY) <= beamWidth) {
+            applyTowerStun(tower, ability.durationMs, { now: timestamp, source: 'chaos_beam' });
+        }
+    }
+    chaosBeams.push({ x1: entity.x, y1: entity.y, x2: endX, y2: endY, width: beamWidth * 2, startTime: timestamp, duration: 1200 });
+}
+
+function createChaosBouncerBall(entity, target, ability, timestamp, index) {
+    const dx = target.x - entity.x;
+    const dy = target.y - entity.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const count = ability.count || 1;
+    const spread = count === 1 ? 0 : Math.PI / 7;
+    const angle = Math.atan2(dy, dx) + (count === 1 ? 0 : ((index / (count - 1)) - 0.5) * spread);
+    const speed = 9;
+    chaosBouncerBalls.push({
+        x: entity.x,
+        y: entity.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        speed,
+        radius: Math.max(10, entity.size * 0.18),
+        remainingBounces: ability.bounces || 0,
+        stunDurationMs: ability.durationMs || 5000,
+        color: entity.type.color || '#FFFFFF',
+        createdAt: timestamp,
+        hitTowers: new Set()
+    });
+}
+
+function updateChaosBouncerBalls(timestamp) {
+    const scale = frameDelta / 16.667 / Math.max(1, gameSpeed);
+    chaosBouncerBalls = chaosBouncerBalls.filter(ball => {
+        if (timestamp - ball.createdAt >= 12000) return false;
+        ball.x += ball.vx * scale;
+        ball.y += ball.vy * scale;
+        let bounced = false;
+
+        if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= gameWidth) {
+            ball.vx *= -1;
+            ball.x = Math.max(ball.radius, Math.min(gameWidth - ball.radius, ball.x));
+            bounced = true;
+        }
+        if (ball.y - ball.radius <= 0 || ball.y + ball.radius >= gameHeight) {
+            ball.vy *= -1;
+            ball.y = Math.max(ball.radius, Math.min(gameHeight - ball.radius, ball.y));
+            bounced = true;
+        }
+
+        for (const tower of towers) {
+            if (!tower || calculateDistance(ball.x, ball.y, tower.x, tower.y) > ball.radius + GRID_SIZE * 0.35) continue;
+            if (!ball.hitTowers.has(tower)) {
+                // These are piercing balls: a tower is stunned once per ball, but the ball keeps travelling.
+                applyTowerStun(tower, ball.stunDurationMs, { now: timestamp, stack: true, source: 'chaos_bouncy' });
+                ball.hitTowers.add(tower);
+            }
+        }
+
+        if (bounced) ball.remainingBounces--;
+        return ball.remainingBounces >= 0;
+    });
+}
+
+function drawChaosEnemyEffects(timestamp) {
+    chaosBouncerBalls.forEach(ball => {
+        ctx.save();
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = ball.color;
+        ctx.fillStyle = ball.color;
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    });
+
+    chaosBeams = chaosBeams.filter(beam => timestamp - beam.startTime < beam.duration);
+    chaosBeams.forEach(beam => {
+        const progress = (timestamp - beam.startTime) / beam.duration;
+        const alpha = Math.max(0, 1 - progress);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.lineCap = 'round';
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#82F7FF';
+        ctx.strokeStyle = 'rgba(76, 40, 190, 0.72)';
+        ctx.lineWidth = beam.width * 1.08;
+        ctx.beginPath();
+        ctx.moveTo(beam.x1, beam.y1);
+        ctx.lineTo(beam.x2, beam.y2);
+        ctx.stroke();
+        const texture = window.cosmicGodTexture;
+        if (texture && texture.complete && texture.naturalWidth > 0) {
+            const beamLength = calculateDistance(beam.x1, beam.y1, beam.x2, beam.y2);
+            const steps = Math.ceil(beamLength / Math.max(24, beam.width * 0.55));
+            for (let step = 0; step <= steps; step++) {
+                const t = step / Math.max(1, steps);
+                const size = beam.width * 0.65;
+                ctx.drawImage(texture, beam.x1 + (beam.x2 - beam.x1) * t - size / 2, beam.y1 + (beam.y2 - beam.y1) * t - size / 2, size, size);
+            }
+        }
+        ctx.strokeStyle = 'rgba(210, 250, 255, 0.95)';
+        ctx.lineWidth = Math.max(3, beam.width * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(beam.x1, beam.y1);
+        ctx.lineTo(beam.x2, beam.y2);
+        ctx.stroke();
+        ctx.restore();
+    });
+}
+
+function triggerChaosAbility(entity, ability, timestamp) {
+    const color = entity.type.color || '#FFFFFF';
+    const durationMs = ability.durationMs || 1000;
+
+    if (ability.kind === 'gun') {
+        for (let shot = 0; shot < (ability.count || 1); shot++) {
+            const tower = getRandomTower();
+            if (!tower) break;
+            applyTowerStun(tower, durationMs, { now: timestamp, source: 'chaos_gun' });
+            projectiles.push({ x1: entity.x, y1: entity.y, x2: tower.x, y2: tower.y, color, width: 3, startTime: timestamp, duration: 180 });
+        }
+    } else if (ability.kind === 'proxima') {
+        applyTowerStunInSquare(entity.x, entity.y, ability.sizeTiles || 2, durationMs, { now: timestamp, source: 'chaos_proxima' });
+        createColoredExplosionEffect(entity.x, entity.y, ability.sizeTiles || 2, timestamp, 500, color, '#FFFFFF');
+    } else if (ability.kind === 'cluster') {
+        for (let blast = 0; blast < (ability.count || 1); blast++) {
+            const tower = getRandomTower();
+            if (!tower) break;
+            applyTowerStun(tower, durationMs, { now: timestamp, source: 'chaos_cluster' });
+            createColoredExplosionEffect(tower.x, tower.y, 1, timestamp, 350, color, '#FFFFFF');
+        }
+    } else if (ability.kind === 'beam') {
+        stunTowersAlongChaosBeam(entity, ability, timestamp);
+    } else if (ability.kind === 'teleport' || ability.kind === 'proximaRam') {
+        const tower = getRandomTower();
+        if (!tower) return;
+        const teleportTargets = ability.kind === 'teleport'
+            ? getRandomDistinctTowers(ability.count || 1)
+            : [tower];
+        entity.chaosTeleport = {
+            returnDistance: entity.distanceTraveled,
+            targets: teleportTargets,
+            targetIndex: 0,
+            nextHopAt: timestamp,
+            hopDurationMs: 300,
+            stunDurationMs: durationMs,
+            color
+        };
+        if (ability.kind === 'proximaRam') {
+            entity.x = tower.x;
+            entity.y = tower.y;
+            applyTowerStunInSquare(entity.x, entity.y, ability.sizeTiles || 2, durationMs, { now: timestamp, source: 'chaos_proxima_ram' });
+            createColoredExplosionEffect(entity.x, entity.y, ability.sizeTiles || 2, timestamp, 500, color, '#FFFFFF');
+        }
+    } else if (ability.kind === 'bouncy') {
+        const target = getRandomTower();
+        if (!target) return;
+        for (let index = 0; index < (ability.count || 1); index++) createChaosBouncerBall(entity, target, ability, timestamp, index);
+    }
+}
+
+function updateChaosEnemy(entity, timestamp) {
+    const type = entity.type;
+    const state = { skipMovement: false };
+
+    if (entity.chaosTeleport) {
+        const teleport = entity.chaosTeleport;
+        if (teleport.targetIndex < teleport.targets.length) {
+            if (timestamp >= teleport.nextHopAt) {
+                const tower = teleport.targets[teleport.targetIndex++];
+                entity.x = tower.x;
+                entity.y = tower.y;
+                applyTowerStun(tower, teleport.stunDurationMs, { now: timestamp, source: 'chaos_teleport' });
+                createColoredExplosionEffect(entity.x, entity.y, 1, timestamp, 350, teleport.color, '#FFFFFF');
+                teleport.nextHopAt = timestamp + teleport.hopDurationMs;
+            }
+            state.skipMovement = true;
+        } else {
+            entity.distanceTraveled = teleport.returnDistance;
+            setEntityPathPosition(entity, entity.distanceTraveled, false);
+            entity.chaosTeleport = null;
+        }
+    }
+
+    if (type.regeneration) {
+        if (entity.lastChaosRegenAt === undefined) entity.lastChaosRegenAt = timestamp;
+        const interval = type.regeneration.intervalMs || 1000;
+        const ticks = Math.floor((timestamp - entity.lastChaosRegenAt) / interval);
+        if (ticks > 0) {
+            entity.hp = Math.min(entity.maxHp, entity.hp + ticks * type.regeneration.amount);
+            entity.lastChaosRegenAt += ticks * interval;
+        }
+    }
+
+    if (type.dynamicResistanceEvery) {
+        const stage = Math.floor((entity.maxHp - entity.hp) / type.dynamicResistanceEvery);
+        if (stage > (entity.chaosResistanceStage || 0)) {
+            entity.chaosResistanceStage = stage;
+            entity.dynamicResistances = { global: type.dynamicGlobalResistance || 0 };
+            for (const damageType of type.dynamicResistanceTypes || []) {
+                const min = type.dynamicResistanceMin || 0;
+                const max = type.dynamicResistanceMax || min;
+                entity.dynamicResistances[damageType] = min + Math.random() * (max - min);
+            }
+        }
+    }
+
+    if (type.rageAtHpPercent && !entity.chaosRageTriggered && entity.hp <= entity.maxHp * type.rageAtHpPercent) {
+        entity.chaosRageTriggered = true;
+        entity.temporaryGlobalResistance = type.rageGlobalResistance || 0;
+        entity.chaosRageUntil = timestamp + (type.ragePauseMs || 0);
+    }
+    if (entity.chaosRageUntil && timestamp < entity.chaosRageUntil) {
+        state.skipMovement = true;
+    } else if (entity.chaosRageTriggered && !entity.chaosRageActive) {
+        entity.chaosRageActive = true;
+        entity.temporaryGlobalResistance = 0;
+        entity.speed = type.rageSpeed || entity.speed;
+    }
+
+    if (type.shieldBreakSpeedMultiplier && !entity.chaosShieldBreakTriggered && entity.shield <= 0) {
+        entity.chaosShieldBreakTriggered = true;
+        entity.speed = type.speed * type.shieldBreakSpeedMultiplier;
+    }
+
+    if (type.unitShot && timestamp - (entity.lastChaosUnitShotAt ?? -Infinity) >= type.unitShot.cooldownMs) {
+        const units = enemies.filter(unit => unit && unit.isSummon && unit.hp > 0);
+        if (units.length > 0) {
+            const target = units[Math.floor(Math.random() * units.length)];
+            const damage = Math.max(0, target.hp * (type.unitShot.percentCurrentHp || 0) + (type.unitShot.flatDamage || 0));
+            applyDamage(target, damage, 'bullet', null, { suppressCash: true });
+            projectiles.push({
+                x1: entity.x,
+                y1: entity.y,
+                x2: target.x,
+                y2: target.y,
+                color: type.unitShot.color || type.color,
+                width: 4,
+                startTime: timestamp,
+                duration: 220
+            });
+            entity.lastChaosUnitShotAt = timestamp;
+        }
+    }
+
+    if (type.strideMoveMs) {
+        if (entity.chaosStrideUntil && timestamp < entity.chaosStrideUntil) {
+            state.skipMovement = true;
+        } else {
+            if (entity.chaosStrideNextPauseAt === undefined) entity.chaosStrideNextPauseAt = timestamp + type.strideMoveMs;
+            if (timestamp >= entity.chaosStrideNextPauseAt) {
+                entity.chaosStrideUntil = timestamp + (type.stridePauseMs || 200);
+                entity.chaosStrideNextPauseAt = entity.chaosStrideUntil + type.strideMoveMs;
+                state.skipMovement = true;
+            }
+        }
+    }
+
+    if (Array.isArray(type.backdashHpPercents)) {
+        const threshold = type.backdashHpPercents.find(percent => !entity.chaosBackdashes?.includes(percent) && entity.hp <= entity.maxHp * percent);
+        if (threshold !== undefined) {
+            entity.chaosBackdashes = entity.chaosBackdashes || [];
+            entity.chaosBackdashes.push(threshold);
+            entity.distanceTraveled = Math.max(0, entity.distanceTraveled - (type.backdashTiles || 10) * GRID_SIZE);
+            setEntityPathPosition(entity, entity.distanceTraveled, false);
+            entity.invulnerableUntil = timestamp + 600;
+            entity.chaosBackdashUntil = timestamp + 600;
+        }
+        if ((entity.chaosBackdashUntil || 0) > timestamp) state.skipMovement = true;
+    }
+
+    const targetedStun = type.nearbyTowerStun || type.towerShot;
+    if (targetedStun && timestamp - (entity.lastChaosTowerStunAt ?? -Infinity) >= targetedStun.cooldownMs) {
+        const tower = type.nearbyTowerStun
+            ? findNearestTower(entity.x, entity.y, candidate => calculateDistance(entity.x, entity.y, candidate.x, candidate.y) <= targetedStun.rangeTiles * GRID_SIZE)
+            : getRandomTower();
+        if (tower) {
+            applyTowerStun(tower, targetedStun.durationMs, { now: timestamp, source: type.nearbyTowerStun ? 'chaos_nearby_stun' : 'chaos_tower_shot' });
+            projectiles.push({ x1: entity.x, y1: entity.y, x2: tower.x, y2: tower.y, color: targetedStun.color || type.color, width: 3, startTime: timestamp, duration: 180 });
+            entity.lastChaosTowerStunAt = timestamp;
+        }
+    }
+
+    if (type.helperType && Array.isArray(type.helperThresholds)) {
+        const threshold = type.helperThresholds.find(percent => !entity.chaosHelperThresholds?.includes(percent) && entity.hp <= entity.maxHp * percent);
+        if (threshold !== undefined && ENEMY_TYPES[type.helperType]) {
+            entity.chaosHelperThresholds = entity.chaosHelperThresholds || [];
+            entity.chaosHelperThresholds.push(threshold);
+            spawnEnemyGroupAtDistance(ENEMY_TYPES[type.helperType], entity.distanceTraveled, type.helperCount || 1, GRID_SIZE * 0.75);
+        }
+    }
+
+    if (Array.isArray(type.chaosAbilities) && timestamp >= (entity.chaosAbilityBusyUntil || 0)) {
+        entity.chaosAbilityLastUsed = entity.chaosAbilityLastUsed || [];
+        const abilityIndex = type.chaosAbilities.findIndex((ability, index) => timestamp - (entity.chaosAbilityLastUsed[index] ?? -Infinity) >= ability.cooldownMs);
+        if (abilityIndex >= 0) {
+            triggerChaosAbility(entity, type.chaosAbilities[abilityIndex], timestamp);
+            entity.chaosAbilityLastUsed[abilityIndex] = timestamp;
+            entity.chaosAbilityBusyUntil = timestamp + (type.chaosAbilityRecoveryMs || 0);
+        }
+    }
+
+    return state;
+}
+
 function isEnemyNearBaseForSummons(entity, minTilesFromBase = 7) {
     if (!entity || entity.isSummon) return false;
     const remainingDistance = Math.max(0, getPathLength() - (entity.distanceTraveled || 0));
@@ -6564,12 +6942,18 @@ function trySpendCashForShot(cost) {
 }
 
 function getEnemyResistance(enemy, damageType, timestamp = performance.now()) {
-    const baseResistance = enemy?.type?.resistances?.[damageType] ?? enemy?.resistance?.[damageType] ?? 0;
+    const dynamicResistance = enemy?.dynamicResistances?.[damageType];
+    const baseResistance = dynamicResistance ?? enemy?.type?.resistances?.[damageType] ?? enemy?.resistance?.[damageType] ?? 0;
     const compounderDebuff = getCompounderResistanceDebuff(enemy, damageType, timestamp);
     if (damageType === 'explosive') {
         return baseResistance + (enemy?.tankHunterExplosiveResistanceDebuff || 0) - compounderDebuff;
     }
     return baseResistance - compounderDebuff;
+}
+function getEnemyGlobalResistance(enemy, timestamp = performance.now()) {
+    const dynamicResistance = enemy?.dynamicResistances?.global;
+    const baseResistance = dynamicResistance ?? enemy?.type?.resistances?.global ?? enemy?.resistance?.global ?? 0;
+    return Math.max(baseResistance, enemy?.temporaryGlobalResistance || 0) - getCompounderResistanceDebuff(enemy, 'global', timestamp);
 }
 function getCompounderResistanceDebuff(enemy, damageType, timestamp = performance.now()) {
     if ((enemy?.compounderResistanceDebuffUntil || 0) <= timestamp) return 0;
@@ -7585,10 +7969,24 @@ function applyDamage(enemy, damage, damageType = 'bullet', summonDamageType = nu
         return 0;
     }
 
+    if (Array.isArray(enemy.type?.allowedDamageTypes) && !enemy.type.allowedDamageTypes.includes(damageType)) {
+        return 0;
+    }
+
+    if (!options.bypassMissChance && enemy.type?.attackMissChance && Math.random() < enemy.type.attackMissChance) {
+        return 0;
+    }
+
     let finalDamage = damage;
 
     if (enemy.hasDroneSight) {
         finalDamage *= 1.1; // +10% damage
+    }
+
+    // Goliath's damage floor is intentionally tested on incoming damage before
+    // global/type resistances, so a 3,000+ hit is not rejected after mitigation.
+    if (enemy.type?.minimumDamage && finalDamage < enemy.type.minimumDamage) {
+        return 0;
     }
 
     // Check for resistances (support both enemy.type.resistances and legacy enemy.resistance)
@@ -7598,7 +7996,7 @@ function applyDamage(enemy, damage, damageType = 'bullet', summonDamageType = nu
         if (resistances) {
             const bypassGlobal = options.bypassGlobal === true;
             const bypassTypeSpecific = options.bypassDamageTypeResistances === true;
-            const adjustedGlobal = getAgentAdjustedResistance((resistances.global || 0) - getCompounderResistanceDebuff(enemy, 'global'), enemy);
+            const adjustedGlobal = getAgentAdjustedResistance(getEnemyGlobalResistance(enemy, performance.now()), enemy);
             if (adjustedGlobal && damageType !== 'piercing' && !bypassGlobal) {
                 finalDamage *= (1 - adjustedGlobal);
             }
@@ -7628,14 +8026,23 @@ function applyDamage(enemy, damage, damageType = 'bullet', summonDamageType = nu
         finalDamage *= 1 + (enemy.goldenTowerDamageTakenAmount || 0.10);
     }
 
+    if (enemy.type?.postResistanceDamageMultiplier) {
+        finalDamage *= enemy.type.postResistanceDamageMultiplier;
+    }
     // Apply damage to shield first, then HP
     let remainingDamage = Math.round(finalDamage);
     if ((enemy.hasShield || enemy.type.hasShield) && enemy.shield > 0) {
-        if (enemy.shield >= remainingDamage) {
-            enemy.shield -= remainingDamage;
+        const shieldResistances = enemy.type?.shieldResistances || {};
+        let shieldMultiplier = 1 - (enemy.type?.shieldDamageReduction || 0);
+        if (damageType !== 'piercing') shieldMultiplier *= 1 - (shieldResistances.global || 0);
+        shieldMultiplier *= 1 - (shieldResistances[damageType] || 0);
+        shieldMultiplier = Math.max(0.0001, shieldMultiplier);
+        const shieldDamage = Math.round(remainingDamage * shieldMultiplier);
+        if (enemy.shield >= shieldDamage) {
+            enemy.shield -= shieldDamage;
             remainingDamage = 0;
         } else {
-            remainingDamage -= enemy.shield;
+            remainingDamage -= Math.ceil(enemy.shield / shieldMultiplier);
             enemy.shield = 0;
         }
     }
@@ -7691,6 +8098,7 @@ function applyDamage(enemy, damage, damageType = 'bullet', summonDamageType = nu
             if (options.fireRate && options.fireRate < 400) {
                 cashOnHit = Math.floor(cashOnHit * 0.2);
             }
+            cashOnHit = Math.floor(cashOnHit * (enemy.type?.cashRewardMultiplier ?? 1));
             cash += cashOnHit;
         }
     }
@@ -8008,7 +8416,15 @@ function updateEnemies(timestamp) {
             if (entity.type.cashReward) {
                 cash += Math.floor(entity.type.cashReward * 0.50);
             } else {
-                cash += Math.floor(entity.maxHp * (entity.type.isKing ? 0.02 : 0.035));
+                cash += Math.floor(entity.maxHp * (entity.type.isKing ? 0.02 : 0.035) * (entity.type.cashRewardMultiplier ?? 1));
+            }
+            if (!entity.isSummon && entity.type.deathTowerStun) {
+                const effect = entity.type.deathTowerStun;
+                applyTowerStunInSquare(entity.x, entity.y, effect.sizeTiles, effect.durationMs, {
+                    now: timestamp,
+                    source: 'chaos_death_explosion'
+                });
+                createColoredExplosionEffect(entity.x, entity.y, effect.sizeTiles, timestamp, 700, effect.color || entity.type.color, '#FFFFFF');
             }
             if (entity.type.selfDestructDamage && !entity.isCBaseSummon) {
                 if (entity.type.selfDestructTiles) {
@@ -8107,6 +8523,7 @@ function updateEnemies(timestamp) {
         }
         // END OF REPLACED BLOCK
         else {
+            const chaosAiState = updateChaosEnemy(entity, timestamp);
             const secretWaveAiState = updateSecretWaveEnemy(entity, timestamp);
             // ═══════════════════════════════════════════════════════════════
             // NIGHTMARE MODE MECHANICS
@@ -8250,7 +8667,7 @@ function updateEnemies(timestamp) {
             }
 
             entity.speed = effectiveSpeed;
-            if (!secretWaveAiState.skipMovement) {
+            if (!secretWaveAiState.skipMovement && !chaosAiState.skipMovement) {
                 moveEntity(entity, false);
                 // Blockpire crystal collision
                 if (typeof blockpireCrystals !== 'undefined' && blockpireCrystals.length > 0) {
@@ -9165,7 +9582,7 @@ function drawSpawnTimer() {
 // Draw entities
 function drawEntities() {
     for (const entity of enemies) {
-        if (entity.type.name === 'Rainbow Cube') {
+        if (entity.type.name === 'Rainbow Cube' || entity.type.rainbow) {
             const gradient = ctx.createLinearGradient(entity.x - entity.size / 2, entity.y - entity.size / 2, entity.x + entity.size / 2, entity.y + entity.size / 2);
             gradient.addColorStop(0, 'red');
             gradient.addColorStop(0.2, 'orange');
@@ -9189,7 +9606,18 @@ function drawEntities() {
             ctx.fill();
             ctx.fillStyle = entity.type.name === 'The Moon Cube' ? '#F4FBFF' : entity.type.color;
         }
-        ctx.fillRect(entity.x - size / 2, entity.y - size / 2, size, size);
+        if (entity.type.texture === 'galaxy' && chaosGalaxyTexture.complete && chaosGalaxyTexture.naturalWidth > 0) {
+            ctx.drawImage(chaosGalaxyTexture, entity.x - size / 2, entity.y - size / 2, size, size);
+        } else {
+            ctx.fillRect(entity.x - size / 2, entity.y - size / 2, size, size);
+        }
+
+        if (entity.type.centerMarkColor) {
+            ctx.fillStyle = entity.type.centerMarkColor;
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y, size * 0.16, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         if (entity.type.name === 'The Moon Cube') {
             const now = performance.now();
