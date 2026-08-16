@@ -6,6 +6,8 @@ const ctx = canvas.getContext('2d');
 const cashDisplay = document.getElementById('cashDisplay');
 const waveDisplay = document.getElementById('waveDisplay');
 const baseHpDisplay = document.getElementById('baseHpDisplay');
+const rubikTimerHud = document.getElementById('rubikTimerHud');
+const rubikTimerDisplay = document.getElementById('rubikTimerDisplay');
 const modeDisplay = document.getElementById('modeDisplay');
 const nextWaveBtn = document.getElementById('nextWaveBtn');
 const skipWaveBtn = document.getElementById('skipWaveBtn');
@@ -3900,7 +3902,14 @@ function executeAgentTargetedAbility(enemy) {
     const lastKey = `last${abilityKey.charAt(0).toUpperCase()}${abilityKey.slice(1)}Time`;
 
     if (abilityKey === 'stun') {
-        enemy.agentStunUntil = Math.max(enemy.agentStunUntil || now, now + ability.duration);
+        // Extremely large bosses cannot be fully frozen by Agent; the same
+        // ability becomes a strong 75% slow for its normal stun duration.
+        const enemyMaxHp = enemy.maxHp || enemy.type?.baseHp || 0;
+        if (enemyMaxHp >= 10_000_000) {
+            addAgentSlowEffect(enemy, 0.75, ability.duration, now);
+        } else {
+            enemy.agentStunUntil = Math.max(enemy.agentStunUntil || now, now + ability.duration);
+        }
     } else if (abilityKey === 'slowdown') {
         addAgentSlowEffect(enemy, ability.amount, ability.duration, now);
     } else if (abilityKey === 'index') {
@@ -3993,7 +4002,7 @@ function showAgentAbilityUI(tower) {
         btn.disabled = !isReady;
 
         let infoText = '';
-        if (key === 'stun') infoText = `${(ability.duration / 1000).toFixed(1)}s stun`;
+        if (key === 'stun') infoText = `${(ability.duration / 1000).toFixed(1)}s stun | 75% slow vs ≥10M HP`;
         else if (key === 'slowdown') infoText = `${Math.round(ability.amount * 100)}% slow`;
         else if (key === 'index') infoText = `+$${ability.cashBonus} | +${Math.round(ability.damageVulnerability * 100)}% dmg`;
         else if (key === 'hijack') infoText = `${(ability.duration / 1000).toFixed(1)}s summon block`;
@@ -5183,6 +5192,11 @@ function spawnEntity(entityType, x, y, isSummon = false, isAlly = false) {
         mainRailgunUses: entityType.mainRailgunUses || 0,
         resistance: entityType.resistance || null
     };
+    if (entityType.name === 'Rubik Cube' && !isSummon && !isAlly) {
+        entity.rubikTimerSeconds = 180;
+        entity.lastRubikTimerTickAt = performance.now();
+        updateRubikTimerDisplay(entity.rubikTimerSeconds, true);
+    }
     enemies.push(entity);
 
     if (entityType.name === 'The Moon Cube' && !isSummon && !isAlly) {
@@ -6328,6 +6342,22 @@ function updateChaosEnemy(entity, timestamp) {
     const type = entity.type;
     const state = { skipMovement: false };
 
+    if (type.name === 'Rubik Cube' && !isGameOver) {
+        if (entity.rubikTimerSeconds === undefined) entity.rubikTimerSeconds = 180;
+        if (entity.lastRubikTimerTickAt === undefined) entity.lastRubikTimerTickAt = timestamp;
+        const elapsedSeconds = Math.floor((timestamp - entity.lastRubikTimerTickAt) / 1000);
+        if (elapsedSeconds > 0) {
+            entity.rubikTimerSeconds -= elapsedSeconds;
+            entity.lastRubikTimerTickAt += elapsedSeconds * 1000;
+            updateRubikTimerDisplay(entity.rubikTimerSeconds, true);
+            if (entity.rubikTimerSeconds <= 0) {
+                entity.rubikTimerSeconds = 0;
+                gameOver();
+                state.skipMovement = true;
+            }
+        }
+    }
+
     if (entity.chaosTeleport) {
         const teleport = entity.chaosTeleport;
         if (teleport.targetIndex < teleport.targets.length) {
@@ -6426,7 +6456,16 @@ function updateChaosEnemy(entity, timestamp) {
         if (threshold !== undefined) {
             entity.chaosBackdashes = entity.chaosBackdashes || [];
             entity.chaosBackdashes.push(threshold);
-            entity.distanceTraveled = Math.max(0, entity.distanceTraveled - (type.backdashTiles || 10) * GRID_SIZE);
+            const goldenCarrierPresent = towers.some(tower => tower?.type?.isGoldenCarrier);
+            const backdashTiles = goldenCarrierPresent ? 1 : (type.backdashTiles || 6);
+            entity.distanceTraveled = Math.max(0, entity.distanceTraveled - backdashTiles * GRID_SIZE);
+            entity.shield = Math.min(entity.maxShield || entity.shield || 0, (entity.shield || 0) + 500000);
+            if (type.name === 'Rubik Cube') {
+                // Backdashing gives Rubik a small amount of extra time to survive.
+                entity.rubikTimerSeconds = (entity.rubikTimerSeconds ?? 180) + 10;
+                entity.lastRubikTimerTickAt = timestamp;
+                updateRubikTimerDisplay(entity.rubikTimerSeconds, true);
+            }
             setEntityPathPosition(entity, entity.distanceTraveled, false);
             entity.invulnerableUntil = timestamp + 600;
             entity.chaosBackdashUntil = timestamp + 600;
@@ -8461,6 +8500,9 @@ function updateEnemies(timestamp) {
                 });
                 createColoredExplosionEffect(entity.x, entity.y, 5, timestamp, 850, '#B5FFE1', '#F3FFF8');
             }
+            if (!entity.isSummon && entity.type.name === 'Rubik Cube') {
+                updateRubikTimerDisplay(0, false);
+            }
             if (!entity.isSummon && entity.type.name === 'The Moon Cube') {
                 stopSecretWaveBossMusic();
             }
@@ -9581,6 +9623,17 @@ function drawSpawnTimer() {
 
 // Draw entities
 function drawEntities() {
+    // Keep the HUD focused: show at most the three living bosses with the
+    // highest maximum HP, regardless of spawn order.
+    const visibleBossBars = enemies.filter(entity =>
+        entity && entity.hp > 0 && !entity.isSummon && entity.type?.showHpBar
+    ).sort((a, b) => (b.maxHp || 0) - (a.maxHp || 0)).slice(0, 3);
+    const visibleBossBarSet = new Set(visibleBossBars);
+    const bossBarCount = visibleBossBars.length;
+    const bossBarColumns = 1;
+    const bossBarRowStride = hpBarCollapsed ? 40 : 76;
+    hpBarToggleRect = null;
+
     for (const entity of enemies) {
         if (entity.type.name === 'Rainbow Cube' || entity.type.rainbow) {
             const gradient = ctx.createLinearGradient(entity.x - entity.size / 2, entity.y - entity.size / 2, entity.x + entity.size / 2, entity.y + entity.size / 2);
@@ -9792,30 +9845,51 @@ function drawEntities() {
         }
 
         // Only show HP bars for bosses with showHpBar flag
-        if (entity.type.showHpBar) {
-            const mainBarWidth = gameWidth * 0.6;
-            const mainBarHeight = hpBarCollapsed ? 30 : 40;
-            const mainBarX = (gameWidth - mainBarWidth) / 2;
-            const mainBarY = hpBarCollapsed ? 60 : (gameHeight / 2 - mainBarHeight / 2);
-            const mainHealthRatio = entity.hp / entity.maxHp;
-            const shieldRatio = entity.shield / entity.maxShield;
+        if (entity.type.showHpBar && visibleBossBarSet.has(entity)) {
+            const bossBarIndex = visibleBossBars.indexOf(entity);
+            const bossBarColumn = bossBarIndex % bossBarColumns;
+            const bossBarRow = Math.floor(bossBarIndex / bossBarColumns);
+            const mainBarWidth = bossBarColumns === 1 ? gameWidth * 0.6 : Math.min(gameWidth * 0.43, 620);
+            const hasBossShield = (entity.hasShield || entity.type.hasShield) && entity.maxShield > 0;
+            const mainBarHeight = hpBarCollapsed ? 20 : 26;
+            const shieldOverlayHeight = hasBossShield ? Math.max(4, Math.floor(mainBarHeight * 0.28)) : 0;
+            const textSpace = hpBarCollapsed ? 0 : 20;
+            const panelHeight = mainBarHeight + textSpace;
+            const mainBarX = bossBarColumns === 1
+                ? (gameWidth - mainBarWidth) / 2
+                : (bossBarColumn === 0 ? 20 : gameWidth - mainBarWidth - 20);
+            const mainBarY = (hpBarCollapsed ? 60 : 45) + bossBarRow * bossBarRowStride;
+            const mainHealthRatio = Math.max(0, Math.min(1, entity.hp / Math.max(1, entity.maxHp)));
+            const shieldRatio = Math.max(0, Math.min(1, entity.shield / Math.max(1, entity.maxShield)));
 
-            // Background
+            // Compact panel with shield rendered as an overlay on the HP bar.
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(mainBarX - 10, mainBarY - 10, mainBarWidth + 20, mainBarHeight + 40);
+            ctx.fillRect(mainBarX - 10, mainBarY - 10, mainBarWidth + 20, panelHeight + 20);
 
             // HP bar background
-            ctx.fillStyle = '#3A0000';
+            ctx.fillStyle = '#260D12';
             ctx.fillRect(mainBarX, mainBarY, mainBarWidth, mainBarHeight);
 
             // HP bar
-            ctx.fillStyle = '#FF0000';
+            const hpGradient = ctx.createLinearGradient(mainBarX, mainBarY, mainBarX + mainBarWidth, mainBarY);
+            hpGradient.addColorStop(0, '#FF3131');
+            hpGradient.addColorStop(1, '#A90000');
+            ctx.fillStyle = hpGradient;
             ctx.fillRect(mainBarX, mainBarY, mainBarWidth * mainHealthRatio, mainBarHeight);
 
-            // Shield bar (if has shield)
-            if ((entity.hasShield || entity.type.hasShield) && entity.shield > 0) {
-                ctx.fillStyle = 'rgba(0, 191, 255, 0.7)';
-                ctx.fillRect(mainBarX, mainBarY, mainBarWidth * shieldRatio, mainBarHeight);
+            if (hasBossShield) {
+                ctx.fillStyle = 'rgba(16, 42, 58, 0.9)';
+                ctx.fillRect(mainBarX, mainBarY, mainBarWidth, shieldOverlayHeight);
+                const shieldGradient = ctx.createLinearGradient(mainBarX, mainBarY, mainBarX + mainBarWidth, mainBarY);
+                shieldGradient.addColorStop(0, '#65E7FF');
+                shieldGradient.addColorStop(1, '#0874B8');
+                ctx.fillStyle = shieldGradient;
+                ctx.globalAlpha = 0.9;
+                ctx.fillRect(mainBarX, mainBarY, mainBarWidth * shieldRatio, shieldOverlayHeight);
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = '#9EEFFF';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(mainBarX, mainBarY, mainBarWidth, shieldOverlayHeight);
             }
 
             // Border
@@ -9830,7 +9904,7 @@ function drawEntities() {
             // Show name only when expanded
             if (!hpBarCollapsed) {
                 ctx.font = 'bold 20px Arial';
-                ctx.fillText(`${entity.type.name}`, gameWidth / 2, mainBarY - 20);
+                ctx.fillText(`${entity.type.name}`, mainBarX + mainBarWidth / 2, mainBarY - 20);
             }
 
             ctx.font = hpBarCollapsed ? '12px Arial' : '16px Arial';
@@ -9846,29 +9920,14 @@ function drawEntities() {
                 hpText += ` | DPS: ${dps.toLocaleString()}`;
             }
 
-            ctx.fillText(hpText, gameWidth / 2, mainBarY + mainBarHeight / 2 + 5);
+            if (!hpBarCollapsed) {
+                const hpPercent = Math.round(mainHealthRatio * 100);
+                const shieldPercent = Math.round(shieldRatio * 100);
+                hpText += `  |  ${hpPercent}% HP`;
+                if (hasBossShield) hpText += `  |  ${shieldPercent}% Shield`;
+            }
+            ctx.fillText(hpText, mainBarX + mainBarWidth / 2, mainBarY + panelHeight - 2);
 
-            // Collapse/Expand toggle button
-            const toggleSize = 30;
-            const toggleX = gameWidth / 2 + mainBarWidth / 2 + 15;
-            const toggleY = mainBarY - 5;
-
-            // Draw button background
-            ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-            ctx.fillRect(toggleX, toggleY, toggleSize, toggleSize);
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(toggleX, toggleY, toggleSize, toggleSize);
-
-            // Draw arrow
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 20px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(hpBarCollapsed ? '▼' : '▲', toggleX + toggleSize / 2, toggleY + toggleSize / 2);
-
-            // Store toggle button rect for click detection
-            hpBarToggleRect = { x: toggleX, y: toggleY, width: toggleSize, height: toggleSize };
         }
 
         // Draw Rainbow Cube main railgun effect directly (since it's unique)
@@ -9889,6 +9948,24 @@ function drawEntities() {
                 ctx.stroke();
             }
         }
+    }
+
+    // One shared collapse/expand button controls every visible boss bar.
+    if (bossBarCount > 0) {
+        const toggleSize = 30;
+        const toggleX = Math.min(gameWidth - toggleSize - 10, gameWidth * 0.82);
+        const toggleY = 90;
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+        ctx.fillRect(toggleX, toggleY, toggleSize, toggleSize);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(toggleX, toggleY, toggleSize, toggleSize);
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hpBarCollapsed ? '▼' : '▲', toggleX + toggleSize / 2, toggleY + toggleSize / 2);
+        hpBarToggleRect = { x: toggleX, y: toggleY, width: toggleSize, height: toggleSize };
     }
 
     // Raygunner line projectile (exclusive to Raygunner tower)
@@ -9947,9 +10024,33 @@ function drawEntities() {
     if (typeof drawGoldenCarrierProjectiles === 'function') drawGoldenCarrierProjectiles(ctx);
 }
 
+function updateRubikTimerDisplay(seconds, visible = true) {
+    if (!rubikTimerHud || !rubikTimerDisplay) return;
+    rubikTimerHud.style.display = visible ? 'flex' : 'none';
+    rubikTimerDisplay.textContent = `${Math.max(0, Math.ceil(seconds))}s`;
+    rubikTimerDisplay.style.color = seconds <= 60 ? '#FF5555' : '#FFFFFF';
+}
+
 // Damage base
 function damageBase(enemy) {
     if (invincible || isGameOver) return; // Invincibility cheat or already game over
+
+    if (enemy.type.name === 'Rubik Cube') {
+        enemy.rubikTimerSeconds = (enemy.rubikTimerSeconds ?? 180) - 60;
+        enemy.lastRubikTimerTickAt = performance.now();
+        updateRubikTimerDisplay(enemy.rubikTimerSeconds, true);
+        console.log(`Rubik Cube entered the base. Timer remaining: ${Math.max(0, enemy.rubikTimerSeconds)}s`);
+
+        if (enemy.rubikTimerSeconds <= 0) {
+            gameOver();
+            return true;
+        }
+
+        enemy.distanceTraveled = 0;
+        enemy.x = path[0].x;
+        enemy.y = path[0].y;
+        return false;
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // OMEGA BOSS LOOP SYSTEM
@@ -10177,6 +10278,8 @@ function resetGame(newGame = false) {
     railgunShots = [];
     mothFadingShots = [];
     bouncerBalls = [];
+    chaosBouncerBalls = [];
+    chaosBeams = [];
     projectiles = [];
     rocketerAcidPools = [];
     enemyTowerAcidZones = [];
@@ -10201,6 +10304,7 @@ function resetGame(newGame = false) {
     agentSweeperEffects = [];
     nextAgentSweeperId = 1;
     isGameOver = false; // Reset game over flag
+    updateRubikTimerDisplay(0, false);
 
     // Clear all Carrier Cube units
     if (typeof clearCarrierUnits === 'function') clearCarrierUnits();

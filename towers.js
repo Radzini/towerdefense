@@ -255,6 +255,7 @@ const TOWER_TYPES = {
         name: 'Agent',
         color: '#2F4F4F',
         cost: 500,
+        limit: 2,
         aoe: false,
         summons: false,
         isAgent: true,
