@@ -5193,7 +5193,7 @@ function spawnEntity(entityType, x, y, isSummon = false, isAlly = false) {
         resistance: entityType.resistance || null
     };
     if (entityType.name === 'Rubik Cube' && !isSummon && !isAlly) {
-        entity.rubikTimerSeconds = 180;
+        entity.rubikTimerSeconds = 240;
         entity.lastRubikTimerTickAt = performance.now();
         updateRubikTimerDisplay(entity.rubikTimerSeconds, true);
     }
@@ -6343,7 +6343,7 @@ function updateChaosEnemy(entity, timestamp) {
     const state = { skipMovement: false };
 
     if (type.name === 'Rubik Cube' && !isGameOver) {
-        if (entity.rubikTimerSeconds === undefined) entity.rubikTimerSeconds = 180;
+        if (entity.rubikTimerSeconds === undefined) entity.rubikTimerSeconds = 240;
         if (entity.lastRubikTimerTickAt === undefined) entity.lastRubikTimerTickAt = timestamp;
         const elapsedSeconds = Math.floor((timestamp - entity.lastRubikTimerTickAt) / 1000);
         if (elapsedSeconds > 0) {
@@ -6462,7 +6462,7 @@ function updateChaosEnemy(entity, timestamp) {
             entity.shield = Math.min(entity.maxShield || entity.shield || 0, (entity.shield || 0) + 500000);
             if (type.name === 'Rubik Cube') {
                 // Backdashing gives Rubik a small amount of extra time to survive.
-                entity.rubikTimerSeconds = (entity.rubikTimerSeconds ?? 180) + 10;
+                entity.rubikTimerSeconds = (entity.rubikTimerSeconds ?? 240) + 20;
                 entity.lastRubikTimerTickAt = timestamp;
                 updateRubikTimerDisplay(entity.rubikTimerSeconds, true);
             }
@@ -10036,7 +10036,7 @@ function damageBase(enemy) {
     if (invincible || isGameOver) return; // Invincibility cheat or already game over
 
     if (enemy.type.name === 'Rubik Cube') {
-        enemy.rubikTimerSeconds = (enemy.rubikTimerSeconds ?? 180) - 60;
+        enemy.rubikTimerSeconds = (enemy.rubikTimerSeconds ?? 240) - 60;
         enemy.lastRubikTimerTickAt = performance.now();
         updateRubikTimerDisplay(enemy.rubikTimerSeconds, true);
         console.log(`Rubik Cube entered the base. Timer remaining: ${Math.max(0, enemy.rubikTimerSeconds)}s`);
