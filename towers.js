@@ -364,6 +364,24 @@ const TOWER_TYPES = {
         ]
     },
 
+    SHIELD_TOWER: {
+        name: 'Shield Tower',
+        color: '#E8E8E8',
+        cost: 5000,
+        limit: 3,
+        size: 1,
+        footprint: { width: 1, height: 1 },
+        aoe: false,
+        summons: false,
+        cannotBeBuffed: true,
+        isShieldTower: true,
+        levels: [
+            { range: 2, stunChargesRequired: 5, stunReductionMs: 3000, stunShieldMs: 3000, cooldownMs: 20000, upgradeCost: 0 },
+            { range: 3, stunChargesRequired: 10, stunReductionMs: 4000, stunShieldMs: 4000, cooldownMs: 20000, upgradeCost: 35000 },
+            { range: 4, stunChargesRequired: 25, stunReductionMs: 5000, stunShieldMs: 5000, cooldownMs: 20000, cannotBeStunned: true, upgradeCost: 120000 }
+        ]
+    },
+
     EXECUTIVE: {
         name: 'Executive',
         color: '#DC143C',
@@ -381,7 +399,7 @@ const TOWER_TYPES = {
             { damage: 30, fireRate: 1000, range: 3, upgradeCost: 800 },
             { damage: 50, fireRate: 500, range: 4, upgradeCost: 3000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 12000, count: 2 }] },
             { damage: 45, fireRate: 100, range: 5, upgradeCost: 12000, summons: [{ type: 'ELITE_OPERATOR', spawnRate: 20000, count: 2 }, { type: 'EXEC_TANK', spawnRate: 50000, count: 1 }] },
-            { damage: 85, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true, summons: [{ type: 'ELITE_OPERATOR_L5', spawnRate: 30000, count: 3 }, { type: 'EXEC_TANK', spawnRate: 60000, count: 1 }, { type: 'EXEC_ARTILLERY', spawnRate: 80000, count: 1 }] }
+            { damage: 85, fireRate: 100, range: 7, upgradeCost: 50000, hasOrbitalStrike: true, cannotBeStunned: true, summons: [{ type: 'ELITE_OPERATOR_L5', spawnRate: 30000, count: 3 }, { type: 'EXEC_TANK', spawnRate: 60000, count: 1 }, { type: 'EXEC_ARTILLERY', spawnRate: 80000, count: 1 }] }
         ]
     },
 

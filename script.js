@@ -49,6 +49,7 @@ const towerButtons = {
     eliteSpawner: document.getElementById('eliteSpawnerBtn'),
     commander: document.getElementById('commanderBtn'),
     agent: document.getElementById('agentBtn'),
+    shieldTower: document.getElementById('shieldTowerBtn'),
     executive: document.getElementById('executiveBtn'),
     cubeFactory: document.getElementById('cubeFactoryBtn'),
     goldenFactory: document.getElementById('goldenFactoryBtn'),
@@ -484,6 +485,10 @@ let hpBarCollapsed = false;
 let hpBarToggleRect = null;
 let lastTowerInfoUpdate = 0;
 let selectedTowerForTimer = null;
+let isCanvasPointerDown = false;
+let lastDragPlacementKey = null;
+let shiftSellMode = false;
+let shiftSellSeenTowers = new Set();
 let agentTargetingActive = false;
 let agentTargetingData = null;
 let agentHijackUntil = 0;
@@ -890,6 +895,7 @@ function setupEventListeners() {
     towerButtons.eliteSpawner.addEventListener('click', () => selectTowerType(TOWER_TYPES.ELITE_SPAWNER));
     towerButtons.commander.addEventListener('click', () => selectTowerType(TOWER_TYPES.COMMANDER));
     if (towerButtons.agent) towerButtons.agent.addEventListener('click', () => selectTowerType(TOWER_TYPES.AGENT));
+    if (towerButtons.shieldTower) towerButtons.shieldTower.addEventListener('click', () => selectTowerType(TOWER_TYPES.SHIELD_TOWER));
     towerButtons.executive.addEventListener('click', () => selectTowerType(TOWER_TYPES.EXECUTIVE));
     towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY));
     if (towerButtons.goldenFactory) towerButtons.goldenFactory.addEventListener('click', (e) => { e.stopPropagation(); selectTowerType(TOWER_TYPES.GOLDEN_FACTORY); });
@@ -913,6 +919,20 @@ function setupEventListeners() {
     // Canvas interactions
     canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+            isCanvasPointerDown = true;
+            lastDragPlacementKey = null;
+        }
+    });
+    canvas.addEventListener('mouseup', () => {
+        isCanvasPointerDown = false;
+        lastDragPlacementKey = null;
+    });
+    canvas.addEventListener('mouseleave', () => {
+        isCanvasPointerDown = false;
+        lastDragPlacementKey = null;
+    });
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         selectedTower = null;
@@ -1116,6 +1136,10 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         window.keysPressed = window.keysPressed || {};
         window.keysPressed[e.key.toLowerCase()] = true;
+        if (e.key === 'Shift' && window.keysPressed.j) {
+            shiftSellMode = true;
+            shiftSellSeenTowers.clear();
+        }
 
         if (gameModeUI.style.display !== 'none') return;
 
@@ -1168,11 +1192,28 @@ function setupEventListeners() {
             return;
         }
 
+        // Shift+E upgrades only the tower's normal levels, never a paragon conversion.
+        if ((e.key === 'e' || e.key === 'E') && e.shiftKey) {
+            e.preventDefault();
+            if (!e.repeat && window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
+                upgradeTowerToMaxAffordable(window.currentSelectedTower);
+            }
+            return;
+        }
+
         // E key to upgrade selected tower
         if (e.key === 'e' || e.key === 'E') {
             if (window.currentSelectedTower && towers.includes(window.currentSelectedTower)) {
                 upgradeTower(window.currentSelectedTower);
             }
+            return;
+        }
+
+        // Hold Shift+J to enter hover-sell mode.
+        if ((e.key === 'j' || e.key === 'J') && e.shiftKey) {
+            e.preventDefault();
+            shiftSellMode = true;
+            shiftSellSeenTowers.clear();
             return;
         }
 
@@ -1245,6 +1286,10 @@ function setupEventListeners() {
 
     document.addEventListener('keyup', (e) => {
         if (window.keysPressed) window.keysPressed[e.key.toLowerCase()] = false;
+        if (e.key === 'j' || e.key === 'J' || e.key === 'Shift') {
+            shiftSellMode = false;
+            shiftSellSeenTowers.clear();
+        }
     });
 
     // Game mode UI listeners
@@ -1752,7 +1797,9 @@ function handleCanvasClick(event) {
         currentInfoTower = clickedTower;
         refreshCanvasCursor();
     } else if (selectedTower) {
-        placeTower(gridX, gridY);
+        const placementKey = `${gridX},${gridY}`;
+        placeTower(gridX, gridY, { keepSelected: !!(event.shiftKey || window.keysPressed?.shift) });
+        if (event.shiftKey || window.keysPressed?.shift) lastDragPlacementKey = placementKey;
     }
 }
 
@@ -1803,10 +1850,30 @@ function handleMouseMove(event) {
         hoveredEnemy = null;
     }
 
+    // Shift+J hover-selling: each tower is sold once as the cursor passes over it.
+    if (shiftSellMode) {
+        const hoveredTower = getTowerAtGrid(gridX, gridY);
+        hoveredEnemy = null;
+        selectedCell = null;
+        if (hoveredTower && !shiftSellSeenTowers.has(hoveredTower)) {
+            shiftSellSeenTowers.add(hoveredTower);
+            sellTower(hoveredTower);
+        }
+        refreshCanvasCursor(!!hoveredTower);
+        return;
+    }
+
     // If in tower placement mode, update selectedCell for placement preview
     if (selectedTower) {
         selectedCell = { x: gridX, y: gridY };
         hoveredEnemy = null;
+        if (isCanvasPointerDown && (event.shiftKey || window.keysPressed?.shift)) {
+            const placementKey = `${gridX},${gridY}`;
+            if (placementKey !== lastDragPlacementKey) {
+                placeTower(gridX, gridY, { keepSelected: true });
+                lastDragPlacementKey = placementKey;
+            }
+        }
         refreshCanvasCursor();
     } else {
         // Check if hovering over an enemy
@@ -2270,6 +2337,16 @@ function showTowerInfo(tower) {
                 </div>
             `;
         }
+    } else if (type.isShieldTower) {
+        const chargeCount = tower.shieldTowerCharges || 0;
+        const cooldownRemaining = Math.max(0, ((tower.shieldTowerCooldownUntil || 0) - performance.now()) / 1000);
+        infoHTML += `
+            <div class="info-row"><div class="info-label">Stun Charges</div><div class="info-value">${chargeCount} / ${currentStats.stunChargesRequired}</div></div>
+            <div class="info-row"><div class="info-label">Protection Range</div><div class="info-value">${currentStats.range} tiles</div></div>
+            <div class="info-row"><div class="info-label">Stun Reduction</div><div class="info-value">${currentStats.stunReductionMs / 1000}s</div></div>
+            <div class="info-row"><div class="info-label">Stun Shield</div><div class="info-value">${currentStats.stunShieldMs / 1000}s</div></div>
+            <div class="info-row"><div class="info-label">Status</div><div class="info-value">${currentStats.cannotBeStunned ? 'Stun Immune' : 'Can be stunned'}${cooldownRemaining > 0 ? ` | Cooldown ${cooldownRemaining.toFixed(1)}s` : ''}</div></div>
+        `;
     } else if (type.support) {
         // Commander tower - show buff stats
         infoHTML += `
@@ -3122,6 +3199,13 @@ function showTowerInfo(tower) {
                     <div class="info-value">Unlocks stronger control tools${nextStats.abilities?.index ? ' + Index' : ''}${nextStats.abilities?.hijack ? ' + Hijack' : ''}${nextStats.abilities?.sweeper ? ' + Sweeper' : ''}${nextStats.abilities?.shieldBreaker ? ' + Shield Breaker' : ''}${nextStats.abilities?.paralyzer ? ' + Paralyzer' : ''}</div>
                 </div>
             `;
+        } else if (type.isShieldTower) {
+            infoHTML += `
+                <div class="info-row">
+                    <div class="info-label">Next Level</div>
+                    <div class="info-value">Range: ${nextStats.range} | Charges: ${nextStats.stunChargesRequired} | Shield: ${(nextStats.stunShieldMs / 1000).toFixed(0)}s | Reduction: ${(nextStats.stunReductionMs / 1000).toFixed(0)}s${nextStats.cannotBeStunned ? ' | Stun Immunity' : ''}</div>
+                </div>
+            `;
         } else {
             infoHTML += `
                 <div class="info-row">
@@ -3420,6 +3504,17 @@ function showTowerInfo(tower) {
         document.getElementById('carrierSpawnPanel').style.display = 'none';
     } else if (type === TOWER_TYPES.ICE_MORTAR) {
         updateIceMortarShootButton(tower);
+        ability2TowerBtn.style.display = 'none';
+    } else if (type.isShieldTower) {
+        const shieldStats = type.levels[level - 1];
+        const shieldCooldown = Math.max(0, ((tower.shieldTowerCooldownUntil || 0) - performance.now()) / 1000);
+        const shieldReady = (tower.shieldTowerCharges || 0) >= shieldStats.stunChargesRequired && shieldCooldown <= 0;
+        abilityTowerBtn.style.display = 'block';
+        abilityTowerBtn.disabled = !shieldReady;
+        abilityTowerBtn.textContent = shieldCooldown > 0
+            ? `🛡️ Shield Flash (${shieldCooldown.toFixed(1)}s)`
+            : `🛡️ Shield Flash [${tower.shieldTowerCharges || 0}/${shieldStats.stunChargesRequired}]`;
+        abilityTowerBtn.onclick = () => activateShieldTower(tower);
         ability2TowerBtn.style.display = 'none';
     } else if (type.isAgent) {
         abilityTowerBtn.style.display = 'none';
@@ -4131,7 +4226,11 @@ function showCubeBaseSpawnUI(tower) {
 }
 
 function initializeSpecialTowerState(tower) {
-    if (tower.type === TOWER_TYPES.AGENT) {
+    if (tower.type?.isShieldTower) {
+        if (tower.shieldTowerCharges === undefined) tower.shieldTowerCharges = 0;
+        if (tower.shieldTowerCooldownUntil === undefined) tower.shieldTowerCooldownUntil = 0;
+        if (tower.shieldTowerFlashUntil === undefined) tower.shieldTowerFlashUntil = 0;
+    } else if (tower.type === TOWER_TYPES.AGENT) {
         if (!tower.agent) {
             tower.agent = {
                 potency: 0,
@@ -4364,7 +4463,19 @@ function upgradeTower(tower) {
     }
 }
 
-function placeTower(gridX, gridY) {
+function upgradeTowerToMaxAffordable(tower) {
+    if (!tower || !tower.type || tower.type.isParagon || !Array.isArray(tower.type.levels)) return;
+    while (tower.level < tower.type.levels.length) {
+        const levelBefore = tower.level;
+        const upgradeCost = freeUpgrades ? 0 : getTowerUpgradeCost(tower);
+        if (!freeUpgrades && cash < upgradeCost) break;
+        upgradeTower(tower);
+        if (tower.level === levelBefore) break;
+    }
+    if (window.currentSelectedTower === tower && towers.includes(tower)) showTowerInfo(tower);
+}
+
+function placeTower(gridX, gridY, options = {}) {
     console.log(`--- Attempting Placement for ${selectedTower ? selectedTower.name : 'Unknown Tower'} ---`);
     console.log(`Target Grid: (${gridX}, ${gridY})`);
     console.log(`Current Cash: ${cash}, Tower Cost: ${selectedTowerCost}`);
@@ -4446,9 +4557,11 @@ function placeTower(gridX, gridY) {
     updateCashDisplay();
     updateTowerButtonCosts();
     window.sfxPlace();
-    selectedTower = null;
-    selectedTowerCost = 0;
-    updateTowerSelection(); // Update selection visual to remove 'selected' class
+    if (!options.keepSelected) {
+        selectedTower = null;
+        selectedTowerCost = 0;
+    }
+    updateTowerSelection();
     refreshCanvasCursor();
 }
 
@@ -5721,7 +5834,18 @@ function getSquareHalfRangePx(tiles) {
 }
 
 function isTowerStunned(tower, timestamp = performance.now()) {
-    return !!tower && !tower.type?.cannotBeStunned && (tower.stunUntil || 0) > timestamp;
+    return !!tower && !isTowerStunImmune(tower) && (tower.stunUntil || 0) > timestamp;
+}
+
+function isTowerStunImmune(tower, options = {}) {
+    if (!tower || !tower.type) return true;
+    const now = options.now || performance.now();
+    if ((tower.stunIgnoresImmunityUntil || 0) > now) return false;
+    // Rubik Cube and Void Zeltron beams are explicitly allowed to stun even
+    // normally immune towers. Other stun sources still respect immunity.
+    if (options.source === 'chaos_beam') return false;
+    const levelStats = tower.type.levels?.[Math.max(0, (tower.level || 1) - 1)] || {};
+    return !!(tower.type.cannotBeStunned || tower.type.isParagon || tower.type.isGoldenCarrier || levelStats.cannotBeStunned || (tower.stunShieldUntil || 0) > now);
 }
 
 function getTowerStunRemainingMs(tower, timestamp = performance.now()) {
@@ -5731,9 +5855,10 @@ function getTowerStunRemainingMs(tower, timestamp = performance.now()) {
 window.isTowerStunned = isTowerStunned;
 
 function applyTowerStun(tower, durationMs, options = {}) {
-    if (!tower || durationMs <= 0 || tower.type?.cannotBeStunned) return false;
+    if (!tower || durationMs <= 0) return false;
 
     const now = options.now || performance.now();
+    if (isTowerStunImmune(tower, { ...options, now })) return false;
     const currentRemaining = getTowerStunRemainingMs(tower, now);
 
     if (options.noStackIfActive && currentRemaining > 0) {
@@ -5749,8 +5874,54 @@ function applyTowerStun(tower, durationMs, options = {}) {
     }
 
     tower.stunUntil = now + nextRemaining;
+    if (options.source === 'chaos_beam') tower.stunIgnoresImmunityUntil = tower.stunUntil;
     tower.lastStunSource = options.source || 'secret_wave';
     tower.lastStunAppliedAt = now;
+    notifyShieldTowersOfStun(tower, now);
+    return true;
+}
+
+function getShieldTowerStats(tower) {
+    if (!tower?.type?.isShieldTower) return null;
+    return tower.type.levels?.[Math.max(0, (tower.level || 1) - 1)] || null;
+}
+
+function notifyShieldTowersOfStun(stunnedTower, timestamp = performance.now()) {
+    if (!stunnedTower || stunnedTower.type?.isShieldTower) return;
+    for (const shieldTower of towers) {
+        const stats = getShieldTowerStats(shieldTower);
+        if (!stats || shieldTower === stunnedTower) continue;
+        if ((shieldTower.shieldTowerCooldownUntil || 0) > timestamp) continue;
+        if (calculateDistance(shieldTower.x, shieldTower.y, stunnedTower.x, stunnedTower.y) <= stats.range * GRID_SIZE) {
+            shieldTower.shieldTowerCharges = Math.min(
+                stats.stunChargesRequired,
+                (shieldTower.shieldTowerCharges || 0) + 1
+            );
+            shieldTower.lastShieldChargeAt = timestamp;
+        }
+    }
+}
+
+function activateShieldTower(tower) {
+    const stats = getShieldTowerStats(tower);
+    if (!stats) return false;
+    const now = performance.now();
+    const charges = tower.shieldTowerCharges || 0;
+    if (charges < stats.stunChargesRequired || (tower.shieldTowerCooldownUntil || 0) > now) return false;
+
+    for (const nearbyTower of towers) {
+        if (nearbyTower === tower) continue;
+        if (calculateDistance(tower.x, tower.y, nearbyTower.x, nearbyTower.y) > stats.range * GRID_SIZE) continue;
+        nearbyTower.stunUntil = Math.max(now, (nearbyTower.stunUntil || now) - stats.stunReductionMs);
+        nearbyTower.stunShieldUntil = Math.max(nearbyTower.stunShieldUntil || 0, now + stats.stunShieldMs);
+    }
+
+    tower.shieldTowerCharges = 0;
+    tower.shieldTowerCooldownUntil = now + stats.cooldownMs;
+    tower.shieldTowerFlashStartedAt = now;
+    tower.shieldTowerFlashUntil = now + 500;
+    if (typeof window.sfxAbility === 'function') window.sfxAbility();
+    showTowerInfo(tower);
     return true;
 }
 
@@ -8204,6 +8375,26 @@ function drawTowers() {
         const py = tower.gridY * GRID_SIZE;
         const pw = towerSizeX * GRID_SIZE;
         const ph = towerSizeY * GRID_SIZE;
+
+        if (tower.type.isShieldTower && (tower.shieldTowerFlashUntil || 0) > performance.now()) {
+            const now = performance.now();
+            const progress = Math.min(1, Math.max(0, (now - (tower.shieldTowerFlashStartedAt || now)) / 500));
+            const stats = getShieldTowerStats(tower);
+            const radius = (stats?.range || 1) * GRID_SIZE * (0.65 + progress * 0.35);
+            ctx.save();
+            ctx.globalAlpha = (1 - progress) * 0.28;
+            ctx.fillStyle = tower.type.color;
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = (1 - progress) * 0.9;
+            ctx.strokeStyle = tower.type.color;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(tower.x, tower.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         // Draw the tower's main body
         if (tower.type.isCosmicGod) {
