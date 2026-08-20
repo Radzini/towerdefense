@@ -382,6 +382,31 @@ const TOWER_TYPES = {
         ]
     },
 
+    TURRET: {
+        name: 'Turret', color: '#808080', cost: 10000, limit: 3, size: 3,
+        footprint: { width: 3, height: 3 }, range: Infinity, aoe: false, summons: false,
+        cannotBeBuffed: true, isTurret: true,
+        levels: [
+            { damage: 100, fireRate: 400, range: Infinity, targetCooldown: 1000, upgradeCost: 0 },
+            { damage: 250, fireRate: 200, range: Infinity, targetCooldown: 1000, upgradeCost: 6000 },
+            { damage: 350, fireRate: 200, autoDamage: 600, autoFireRate: 600, autoExplosionTiles: 3, range: Infinity, targetCooldown: 1000, modeCooldown: 20000, upgradeCost: 20000 },
+            { damage: 600, fireRate: 150, autoDamage: 1000, autoFireRate: 600, autoExplosionTiles: 3, range: Infinity, targetCooldown: 1000, modeCooldown: 20000, turretShieldHp: 5, turretRepairMs: 12000, turretNoStunRegenDelayMs: 10000, turretRegenIntervalMs: 6000, upgradeCost: 80000 },
+            { damage: 1000, fireRate: 100, autoDamage: 3500, autoFireRate: 1000, autoExplosionTiles: 3, range: Infinity, targetCooldown: 1000, modeCooldown: 20000, turretShieldHp: 10, turretRepairMs: 20000, turretNoStunRegenDelayMs: 10000, turretRegenIntervalMs: 4000, upgradeCost: 124000 }
+        ]
+    },
+
+    MINELAYER: {
+        name: 'Minelayer', color: '#0B1F5E', cost: 1000, limit: 2, size: 1,
+        footprint: { width: 1, height: 1 }, range: 2, aoe: false, summons: false,
+        cannotBeBuffed: true, isMinelayer: true,
+        levels: [
+            { range: 2, mineDamage: 200, mineCooldown: 7000, upgradeCost: 0 },
+            { range: 2, mineDamage: 600, mineCooldown: 6000, upgradeCost: 2500 },
+            { range: 2, mineDamage: 2000, mineCooldown: 5000, upgradeCost: 7000 },
+            { range: 2, mineDamage: 5000, mineCooldown: 4000, upgradeCost: 25000 }
+        ]
+    },
+
     EXECUTIVE: {
         name: 'Executive',
         color: '#DC143C',

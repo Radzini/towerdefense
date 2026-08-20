@@ -50,6 +50,8 @@ const towerButtons = {
     commander: document.getElementById('commanderBtn'),
     agent: document.getElementById('agentBtn'),
     shieldTower: document.getElementById('shieldTowerBtn'),
+    turret: document.getElementById('turretBtn'),
+    minelayer: document.getElementById('minelayerBtn'),
     executive: document.getElementById('executiveBtn'),
     cubeFactory: document.getElementById('cubeFactoryBtn'),
     goldenFactory: document.getElementById('goldenFactoryBtn'),
@@ -489,6 +491,7 @@ let isCanvasPointerDown = false;
 let lastDragPlacementKey = null;
 let shiftSellMode = false;
 let shiftSellSeenTowers = new Set();
+let turretTargetingActive = false;
 let agentTargetingActive = false;
 let agentTargetingData = null;
 let agentHijackUntil = 0;
@@ -733,6 +736,7 @@ function refreshCanvasCursor(isHoveringInteractive = false) {
         orbitalStrikeActive ||
         agentTargetingActive ||
         carrierTargetingMode ||
+        (turretTargetingActive && currentInfoTower?.type?.isTurret && !currentInfoTower.turretAutoMode) ||
         (typeof mafia_targeting_active !== 'undefined' && mafia_targeting_active) ||
         (typeof blockpireTargetingActive !== 'undefined' && blockpireTargetingActive) ||
         (typeof eclipseWeaverNullImprintActive !== 'undefined' && eclipseWeaverNullImprintActive) ||
@@ -896,6 +900,8 @@ function setupEventListeners() {
     towerButtons.commander.addEventListener('click', () => selectTowerType(TOWER_TYPES.COMMANDER));
     if (towerButtons.agent) towerButtons.agent.addEventListener('click', () => selectTowerType(TOWER_TYPES.AGENT));
     if (towerButtons.shieldTower) towerButtons.shieldTower.addEventListener('click', () => selectTowerType(TOWER_TYPES.SHIELD_TOWER));
+    if (towerButtons.turret) towerButtons.turret.addEventListener('click', () => selectTowerType(TOWER_TYPES.TURRET));
+    if (towerButtons.minelayer) towerButtons.minelayer.addEventListener('click', () => selectTowerType(TOWER_TYPES.MINELAYER));
     towerButtons.executive.addEventListener('click', () => selectTowerType(TOWER_TYPES.EXECUTIVE));
     towerButtons.cubeFactory.addEventListener('click', () => selectTowerType(TOWER_TYPES.CUBE_FACTORY));
     if (towerButtons.goldenFactory) towerButtons.goldenFactory.addEventListener('click', (e) => { e.stopPropagation(); selectTowerType(TOWER_TYPES.GOLDEN_FACTORY); });
@@ -1755,6 +1761,21 @@ function handleCanvasClick(event) {
         return;
     }
 
+    // Manual Turret targeting takes priority over the normal enemy inspector.
+    if (turretTargetingActive && currentInfoTower?.type?.isTurret && !currentInfoTower.turretAutoMode) {
+        const turretTarget = enemies.find(e => {
+            if (e.isSummon || e.hp <= 0) return false;
+            return calculateDistance(mouseX, mouseY, e.x, e.y) <= (e.type.size || 20);
+        });
+        if (turretTarget) {
+            if (selectTurretTarget(currentInfoTower, turretTarget)) {
+                turretTargetingActive = false;
+                showTowerInfo(currentInfoTower);
+            }
+            return;
+        }
+    }
+
     // Check if clicking on an enemy/summon for stat inspector NEXT
     // "enemy panel should be visible once i click the enemy, it doesnt matter on the tower"
     const clickedEntity = enemies.find(e => {
@@ -2224,6 +2245,7 @@ function show_entity_stats_panel(entity) {
 
 // Show tower info
 function showTowerInfo(tower) {
+    if (currentInfoTower !== tower) turretTargetingActive = false;
     const panelTitle = document.querySelector('#towerInfoPanel .panel-header h3');
     if (panelTitle) panelTitle.textContent = 'Tower Info';
     // Store the tower reference globally
@@ -2337,6 +2359,15 @@ function showTowerInfo(tower) {
                 </div>
             `;
         }
+    } else if (type.isTurret) {
+        const modeCooldown = Math.max(0, ((tower.turretModeCooldownUntil || 0) - performance.now()) / 1000);
+        infoHTML += `<div class="info-row"><div class="info-label">Mode</div><div class="info-value">${tower.turretAutoMode ? 'Auto rockets' : 'Manual bullets'}</div></div>`;
+        infoHTML += `<div class="info-row"><div class="info-label">Target</div><div class="info-value">${tower.turretTarget?.type?.name || 'None — click an enemy'}</div></div>`;
+        infoHTML += `<div class="info-row"><div class="info-label">Damage</div><div class="info-value">${currentStats.damage}${currentStats.autoDamage ? ` manual / ${currentStats.autoDamage} auto` : ''}</div></div>`;
+        if (currentStats.turretShieldHp) infoHTML += `<div class="info-row"><div class="info-label">Turret Shield</div><div class="info-value">${Math.max(0, tower.turretShieldHp || 0)} / ${currentStats.turretShieldHp}${(tower.turretRepairUntil || 0) > performance.now() ? ' (repairing)' : ''}</div></div>`;
+    } else if (type.isMinelayer) {
+        infoHTML += `<div class="info-row"><div class="info-label">Mines</div><div class="info-value">${tower.turretMines?.length || 0} / 10</div></div>`;
+        infoHTML += `<div class="info-row"><div class="info-label">Mine Damage</div><div class="info-value">${currentStats.mineDamage} true damage</div></div>`;
     } else if (type.isShieldTower) {
         const chargeCount = tower.shieldTowerCharges || 0;
         const cooldownRemaining = Math.max(0, ((tower.shieldTowerCooldownUntil || 0) - performance.now()) / 1000);
@@ -3199,6 +3230,10 @@ function showTowerInfo(tower) {
                     <div class="info-value">Unlocks stronger control tools${nextStats.abilities?.index ? ' + Index' : ''}${nextStats.abilities?.hijack ? ' + Hijack' : ''}${nextStats.abilities?.sweeper ? ' + Sweeper' : ''}${nextStats.abilities?.shieldBreaker ? ' + Shield Breaker' : ''}${nextStats.abilities?.paralyzer ? ' + Paralyzer' : ''}</div>
                 </div>
             `;
+        } else if (type.isTurret) {
+            infoHTML += `<div class="info-row"><div class="info-label">Next Level</div><div class="info-value">${nextStats.autoDamage ? `Manual: ${nextStats.damage} | Auto: ${nextStats.autoDamage} rockets` : `Manual: ${nextStats.damage} bullets`} | Fire rate: ${(nextStats.fireRate / 1000).toFixed(2)}s${nextStats.turretShieldHp ? ` | Shield: ${nextStats.turretShieldHp}` : ''}</div></div>`;
+        } else if (type.isMinelayer) {
+            infoHTML += `<div class="info-row"><div class="info-label">Next Level</div><div class="info-value">Mine damage: ${nextStats.mineDamage} true | Cooldown: ${(nextStats.mineCooldown / 1000).toFixed(1)}s</div></div>`;
         } else if (type.isShieldTower) {
             infoHTML += `
                 <div class="info-row">
@@ -3504,6 +3539,28 @@ function showTowerInfo(tower) {
         document.getElementById('carrierSpawnPanel').style.display = 'none';
     } else if (type === TOWER_TYPES.ICE_MORTAR) {
         updateIceMortarShootButton(tower);
+        ability2TowerBtn.style.display = 'none';
+    } else if (type.isTurret) {
+        const turretStats = type.levels[level - 1];
+        ability2TowerBtn.style.display = 'none';
+        if (turretStats.autoDamage) {
+            const modeCooldown = Math.max(0, ((tower.turretModeCooldownUntil || 0) - performance.now()) / 1000);
+            ability2TowerBtn.style.display = 'block';
+            ability2TowerBtn.disabled = modeCooldown > 0;
+            ability2TowerBtn.textContent = modeCooldown > 0 ? `🔄 Mode Switch (${modeCooldown.toFixed(1)}s)` : `🔄 Switch to ${tower.turretAutoMode ? 'Manual' : 'Auto'}`;
+            ability2TowerBtn.onclick = () => toggleTurretMode(tower);
+        }
+        abilityTowerBtn.style.display = 'block';
+        abilityTowerBtn.disabled = tower.turretAutoMode || (tower.turretRepairUntil || 0) > performance.now();
+        abilityTowerBtn.textContent = tower.turretAutoMode ? '🎯 Manual Targeting Disabled' : (turretTargetingActive ? '🎯 Cancel Targeting' : '🎯 Choose Target');
+        abilityTowerBtn.onclick = () => {
+            if (!tower.turretAutoMode && (tower.turretRepairUntil || 0) <= performance.now()) {
+                turretTargetingActive = !turretTargetingActive;
+            }
+            showTowerInfo(tower);
+        };
+    } else if (type.isMinelayer) {
+        abilityTowerBtn.style.display = 'none';
         ability2TowerBtn.style.display = 'none';
     } else if (type.isShieldTower) {
         const shieldStats = type.levels[level - 1];
@@ -4230,6 +4287,25 @@ function initializeSpecialTowerState(tower) {
         if (tower.shieldTowerCharges === undefined) tower.shieldTowerCharges = 0;
         if (tower.shieldTowerCooldownUntil === undefined) tower.shieldTowerCooldownUntil = 0;
         if (tower.shieldTowerFlashUntil === undefined) tower.shieldTowerFlashUntil = 0;
+    } else if (tower.type?.isTurret) {
+        if (tower.turretAutoMode === undefined) tower.turretAutoMode = false;
+        if (tower.turretTargetSwitchAt === undefined) tower.turretTargetSwitchAt = -Infinity;
+        if (tower.turretModeCooldownUntil === undefined) tower.turretModeCooldownUntil = 0;
+        if (tower.turretMines === undefined) tower.turretMines = [];
+        const stats = tower.type.levels?.[Math.max(0, (tower.level || 1) - 1)] || {};
+        if (stats.turretShieldHp) {
+            if (tower.turretShieldStateLevel !== tower.level) {
+                tower.turretShieldHp = stats.turretShieldHp;
+                tower.turretShieldStateLevel = tower.level;
+            }
+            tower.turretShieldMaxHp = stats.turretShieldHp;
+            if (tower.turretLastStunAt === undefined) tower.turretLastStunAt = -Infinity;
+            if (tower.turretNextRegenAt === undefined) tower.turretNextRegenAt = 0;
+            if (tower.turretRepairUntil === undefined) tower.turretRepairUntil = 0;
+        }
+    } else if (tower.type?.isMinelayer) {
+        if (tower.turretMines === undefined) tower.turretMines = [];
+        if (tower.minelayerLastMineAt === undefined) tower.minelayerLastMineAt = -Infinity;
     } else if (tower.type === TOWER_TYPES.AGENT) {
         if (!tower.agent) {
             tower.agent = {
@@ -4290,6 +4366,7 @@ function initializeSpecialTowerState(tower) {
 
 
 function hideActiveInfoPanels() {
+    turretTargetingActive = false;
     towerInfoPanel.style.display = 'none';
     towerActions.style.display = 'none';
     document.getElementById('carrierSpawnPanel').style.display = 'none';
@@ -5845,6 +5922,7 @@ function isTowerStunImmune(tower, options = {}) {
     // normally immune towers. Other stun sources still respect immunity.
     if (options.source === 'chaos_beam') return false;
     const levelStats = tower.type.levels?.[Math.max(0, (tower.level || 1) - 1)] || {};
+    if (tower.type.isTurret && levelStats.turretShieldHp && ((tower.turretShieldHp || 0) > 0 || (tower.turretRepairUntil || 0) > now)) return true;
     return !!(tower.type.cannotBeStunned || tower.type.isParagon || tower.type.isGoldenCarrier || levelStats.cannotBeStunned || (tower.stunShieldUntil || 0) > now);
 }
 
@@ -5858,6 +5936,7 @@ function applyTowerStun(tower, durationMs, options = {}) {
     if (!tower || durationMs <= 0) return false;
 
     const now = options.now || performance.now();
+    if (tower.type?.isTurret && damageTurretStunShield(tower, options.source || 'secret_wave', now)) return false;
     if (isTowerStunImmune(tower, { ...options, now })) return false;
     const currentRemaining = getTowerStunRemainingMs(tower, now);
 
@@ -7808,6 +7887,143 @@ function updateLunarCubeTower(tower, stats, timestamp) {
     }
 }
 
+function updateTurretShieldState(tower, stats, timestamp) {
+    if (!stats.turretShieldHp) return false;
+    if ((tower.turretRepairUntil || 0) > timestamp) return true;
+    if ((tower.turretShieldHp || 0) <= 0) {
+        tower.turretShieldHp = stats.turretShieldHp;
+        tower.turretShieldMaxHp = stats.turretShieldHp;
+        return false;
+    }
+    if (timestamp - (tower.turretLastStunAt || -Infinity) >= stats.turretNoStunRegenDelayMs) {
+        if ((tower.turretNextRegenAt || 0) <= timestamp) {
+            tower.turretShieldHp = Math.min(stats.turretShieldHp, tower.turretShieldHp + 1);
+            tower.turretNextRegenAt = timestamp + stats.turretRegenIntervalMs;
+        }
+    }
+    return false;
+}
+
+function damageTurretStunShield(tower, source, timestamp) {
+    const stats = tower?.type?.levels?.[(tower.level || 1) - 1];
+    if (!tower?.type?.isTurret || !stats?.turretShieldHp) return false;
+    if ((tower.turretRepairUntil || 0) > timestamp) return true;
+    const damage = source === 'chaos_beam' ? 5 : source === 'chaos_bouncy' ? 2 : source === 'chaos_teleport' ? 1 : 1;
+    tower.turretShieldHp = Math.max(0, (tower.turretShieldHp ?? stats.turretShieldHp) - damage);
+    tower.turretLastStunAt = timestamp;
+    tower.turretNextRegenAt = timestamp + stats.turretNoStunRegenDelayMs;
+    if (tower.turretShieldHp <= 0) {
+        tower.turretRepairUntil = timestamp + stats.turretRepairMs;
+        tower.turretTarget = null;
+        tower.target = null;
+    }
+    return true;
+}
+
+function updateTurretTower(tower, stats, timestamp) {
+    if (updateTurretShieldState(tower, stats, timestamp)) {
+        tower.isFiring = false;
+        return;
+    }
+    const targetValid = tower.turretTarget && tower.turretTarget.hp > 0 && enemies.includes(tower.turretTarget);
+    if (tower.turretAutoMode && stats.autoDamage) {
+        if (!targetValid) tower.turretTarget = findTarget(tower);
+        const target = tower.turretTarget;
+        if (target && timestamp - (tower.turretLastFired || -Infinity) >= stats.autoFireRate) {
+            applyExplosionDamageAt(target.x, target.y, stats.autoExplosionTiles, stats.autoDamage, 'explosive');
+            projectiles.push({ x1: tower.x, y1: tower.y, x2: target.x, y2: target.y, color: '#FF9D3D', width: 4, startTime: timestamp, duration: 180 });
+            createExplosionEffect(target.x, target.y, stats.autoExplosionTiles, timestamp, 350);
+            tower.turretLastFired = timestamp;
+            tower.isFiring = true;
+        } else tower.isFiring = false;
+        return;
+    }
+    if (!targetValid) {
+        tower.turretTarget = null;
+        tower.isFiring = false;
+        return;
+    }
+    if (timestamp - (tower.turretTargetSwitchAt || -Infinity) < stats.targetCooldown) {
+        tower.isFiring = false;
+        return;
+    }
+    if (timestamp - (tower.turretLastFired || -Infinity) >= stats.fireRate) {
+        applyDamage(tower.turretTarget, stats.damage, 'bullet');
+        projectiles.push({ x1: tower.x, y1: tower.y, x2: tower.turretTarget.x, y2: tower.turretTarget.y, color: tower.type.color, width: 3, startTime: timestamp, duration: 100 });
+        tower.turretLastFired = timestamp;
+        tower.isFiring = true;
+    } else tower.isFiring = false;
+}
+
+function toggleTurretMode(tower) {
+    const stats = tower?.type?.levels?.[(tower.level || 1) - 1];
+    if (!stats?.autoDamage || (tower.turretModeCooldownUntil || 0) > performance.now()) return false;
+    tower.turretAutoMode = !tower.turretAutoMode;
+    tower.turretTarget = null;
+    tower.turretTargetSwitchAt = performance.now();
+    tower.turretModeCooldownUntil = performance.now() + stats.modeCooldown;
+    showTowerInfo(tower);
+    return true;
+}
+
+function selectTurretTarget(tower, enemy) {
+    if (!tower?.type?.isTurret || tower.turretAutoMode || !enemy || enemy.isSummon || enemy.hp <= 0) return false;
+    const now = performance.now();
+    if ((tower.turretRepairUntil || 0) > now) return false;
+    const stats = tower.type.levels[(tower.level || 1) - 1];
+    if (now - (tower.turretTargetSwitchAt || -Infinity) < stats.targetCooldown) return false;
+    tower.turretTarget = enemy;
+    tower.turretTargetSwitchAt = now;
+    return true;
+}
+
+function updateMinelayerTower(tower, stats, timestamp) {
+    if (!Array.isArray(tower.turretMines)) tower.turretMines = [];
+    if (tower.turretMines.length >= 10 || timestamp - (tower.minelayerLastMineAt || -Infinity) < stats.mineCooldown) return;
+    const counts = new Map();
+    for (const minelayer of towers) {
+        for (const mine of (minelayer.turretMines || [])) counts.set(mine.pathIndex, (counts.get(mine.pathIndex) || 0) + 1);
+    }
+    const placeMine = (maxRange) => {
+        let best = null;
+        for (let i = 0; i < path.length; i++) {
+            if ((counts.get(i) || 0) >= 4) continue;
+            const distance = calculateDistance(tower.x, tower.y, path[i].x, path[i].y);
+            if (distance <= maxRange * GRID_SIZE && (!best || distance < best.distance)) best = { pathIndex: i, distance, x: path[i].x, y: path[i].y };
+        }
+        return best;
+    };
+    const mine = placeMine(stats.range) || placeMine(3);
+    if (!mine) return;
+    const randomOffset = GRID_SIZE * 0.32;
+    tower.turretMines.push({
+        ...mine,
+        x: mine.x + (Math.random() * 2 - 1) * randomOffset,
+        y: mine.y + (Math.random() * 2 - 1) * randomOffset,
+        placedAt: timestamp,
+        owner: tower
+    });
+    tower.minelayerLastMineAt = timestamp;
+}
+
+function triggerMinelayerMine(entity, timestamp) {
+    if (!entity || entity.isSummon || entity.hp <= 0) return;
+    for (const tower of towers) {
+        if (!tower.type?.isMinelayer || !Array.isArray(tower.turretMines)) continue;
+        const mineHalfSize = GRID_SIZE * 0.135;
+        const hit = tower.turretMines.findIndex(mine =>
+            Math.abs(entity.x - mine.x) <= mineHalfSize + (entity.size || 0) * 0.25 &&
+            Math.abs(entity.y - mine.y) <= mineHalfSize + (entity.size || 0) * 0.25
+        );
+        if (hit < 0) continue;
+        const mine = tower.turretMines.splice(hit, 1)[0];
+        const stats = tower.type.levels[(tower.level || 1) - 1];
+        applyDamage(entity, stats.mineDamage, 'true', null, { bypassResistances: true });
+        createExplosionEffect(mine.x, mine.y, 1, timestamp, 250);
+        projectiles.push({ x1: mine.x, y1: mine.y, x2: entity.x, y2: entity.y, color: '#3B6DFF', width: 3, startTime: timestamp, duration: 120 });
+    }
+}
+
 // Update towers
 function updateTowers(timestamp) {
     for (const tower of towers) {
@@ -7997,6 +8213,10 @@ function updateTowers(timestamp) {
             updateIceMortarTower(tower, stats, timestamp);
         } else if (tower.type === TOWER_TYPES.COMPOUNDER) {
             updateCompounderTower(tower, stats, timestamp);
+        } else if (tower.type.isTurret) {
+            updateTurretTower(tower, stats, timestamp);
+        } else if (tower.type.isMinelayer) {
+            updateMinelayerTower(tower, stats, timestamp);
         }
 
         // --- Attacker Tower Logic (also runs for hybrid towers like Executive) ---
@@ -8482,6 +8702,35 @@ function drawTowers() {
             drawGoldenMafiaElectricity(ctx, tower, performance.now());
         }
 
+        if (tower.type.isTurret) {
+            const turretStats = tower.type.levels[(tower.level || 1) - 1];
+            const repairing = (tower.turretRepairUntil || 0) > performance.now();
+            if (turretStats?.turretShieldHp && !repairing && (tower.turretShieldHp || 0) > 0) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(150, 225, 255, 0.8)';
+                ctx.fillStyle = 'rgba(120, 210, 255, 0.12)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(tower.x, tower.y, Math.max(pw, ph) * 0.62, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        if (tower.type.isMinelayer && Array.isArray(tower.turretMines)) {
+            for (const mine of tower.turretMines) {
+                ctx.save();
+                ctx.fillStyle = '#132A83';
+                ctx.strokeStyle = '#6C8CFF';
+                ctx.lineWidth = 2;
+                const mineSize = GRID_SIZE * 0.27;
+                ctx.fillRect(mine.x - mineSize / 2, mine.y - mineSize / 2, mineSize, mineSize);
+                ctx.strokeRect(mine.x - mineSize / 2, mine.y - mineSize / 2, mineSize, mineSize);
+                ctx.restore();
+            }
+        }
+
         // Draw level or radian indicator
         ctx.fillStyle = 'white';
         ctx.font = '10px Arial';
@@ -8902,6 +9151,7 @@ function updateEnemies(timestamp) {
             entity.speed = effectiveSpeed;
             if (!secretWaveAiState.skipMovement && !chaosAiState.skipMovement) {
                 moveEntity(entity, false);
+                triggerMinelayerMine(entity, timestamp);
                 // Blockpire crystal collision
                 if (typeof blockpireCrystals !== 'undefined' && blockpireCrystals.length > 0) {
                     for (var _bpc = 0; _bpc < blockpireCrystals.length; _bpc++) {
@@ -9854,6 +10104,22 @@ function drawEntities() {
             ctx.drawImage(chaosGalaxyTexture, entity.x - size / 2, entity.y - size / 2, size, size);
         } else {
             ctx.fillRect(entity.x - size / 2, entity.y - size / 2, size, size);
+        }
+
+        if (hoveredEnemy === entity && turretTargetingActive && currentInfoTower?.type?.isTurret && !currentInfoTower.turretAutoMode && !entity.isSummon && entity.hp > 0) {
+            ctx.save();
+            ctx.strokeStyle = '#FFD84A';
+            ctx.fillStyle = 'rgba(255, 216, 74, 0.16)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(entity.x, entity.y, size * 0.72, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#FFF1A8';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('TARGET', entity.x, entity.y - size / 2 - 10);
+            ctx.restore();
         }
 
         if (entity.type.centerMarkColor) {
